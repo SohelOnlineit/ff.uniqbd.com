@@ -240,6 +240,13 @@ function dashboard() {
   const tokens = pgOne("SELECT COUNT(*) AS n FROM unipin_vouchers WHERE lower(status) = 'available'") || {};
   const balance = pgOne('SELECT COALESCE(SUM(balance), 0) AS n FROM unipin_loaded_accounts') || {};
   const ext = pgOne('SELECT last_seen_at FROM extension_status LIMIT 1') || {};
+  const reseller = pgOne(`
+    SELECT extension_key, allowed_ips,
+           (telegram_chat_id IS NOT NULL AND length(telegram_chat_id) > 0) AS telegram_connected
+    FROM resellers
+    ORDER BY id
+    LIMIT 1
+  `) || {};
   const packages = pgJson(`
     SELECT p.id, p.package_code, p.arora_service_id, p.name, p.diamonds,
            p.unipin_uc_cost, p.low_stock_threshold, p.is_active,
@@ -276,11 +283,11 @@ function dashboard() {
     accounts,
     orders,
     security_info: {
-      extension_key: '',
+      extension_key: reseller.extension_key || '',
       encryption: 'AES-256',
       auth_scheme: 'Bearer',
-      allowed_ips: '127.0.0.1',
-      telegram_connected: false,
+      allowed_ips: reseller.allowed_ips || '127.0.0.1',
+      telegram_connected: Boolean(reseller.telegram_connected),
     },
   };
 }
