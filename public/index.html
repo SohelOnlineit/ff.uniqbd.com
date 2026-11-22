@@ -830,7 +830,7 @@
         if (r.token) localStorage.setItem('arora_admin_token', r.token);
         checkAuth();
       } else {
-        document.getElementById('loginErr').textContent = 'Invalid username or password.';
+        document.getElementById('loginErr').textContent = r.error || 'Invalid username or password.';
       }
     });
 

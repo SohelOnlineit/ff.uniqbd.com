@@ -218,11 +218,33 @@ function dashboard() {
   };
 }
 
+function applyAdminReset() {
+  const password = String(process.env.RESET_ADMIN_PASSWORD || '').trim();
+  if (!password) return;
+  const hash = hashPassword(password);
+  pg("UPDATE admins SET password_hash = " + sqlString(hash) + " WHERE username = 'aroraadmin'");
+  if (fs.existsSync(envFile)) {
+    const raw = fs.readFileSync(envFile, 'utf8');
+    const lines = raw.split(/\r?\n/);
+    const kept = lines.filter((line) => !line.startsWith('RESET_ADMIN_PASSWORD='));
+    if (kept.length !== lines.length) {
+      fs.writeFileSync(envFile, kept.join('\n').replace(/\n*$/, '\n'));
+    }
+  }
+  console.log('admin password reset applied');
+}
+
 if (process.argv[2] === '--hash') {
   const password = process.argv[3] || '';
   if (!password) process.exit(1);
   process.stdout.write(hashPassword(password));
   process.exit(0);
+}
+
+try {
+  applyAdminReset();
+} catch (err) {
+  console.error('admin password reset failed:', err && err.message ? err.message : err);
 }
 
 const server = http.createServer(async (req, res) => {
@@ -238,7 +260,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = JSON.parse(await readBody(req) || '{}');
       const username = String(body.username || '').trim();
-      const password = String(body.password || '');
+      const password = String(body.password || '').trim();
       if (!username || !password || !authSecret) return sendJson(res, 401, { ok: false });
       const row = pgOne('SELECT username, password_hash FROM admins WHERE username = ' + sqlString(username));
       if (!row || !verifyPassword(password, row.password_hash)) return sendJson(res, 401, { ok: false });
