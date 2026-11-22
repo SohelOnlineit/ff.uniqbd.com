@@ -296,7 +296,7 @@
           <div class="field">
             <label>API Base URL</label>
             <div class="key-row">
-              <input type="text" id="apiBaseUrl" class="mono" value="https://api.arorashop.com" readonly />
+              <input type="text" id="apiBaseUrl" class="mono" value="https://ff.uniqbd.com" readonly />
               <button class="btn btn-sm" onclick="copyField('apiBaseUrl')">Copy</button>
             </div>
           </div>
@@ -369,9 +369,9 @@
           <pre class="code" id="docOrderNode"></pre>
 
           <div class="doc-h3">5. Check Order Status, Wallet Balance &amp; Price List</div>
-          <pre class="code">GET https://api.arorashop.com/api/reseller/v1/order/{order_id}
-GET https://api.arorashop.com/api/reseller/v1/balance
-GET https://api.arorashop.com/api/reseller/v1/packages</pre>
+          <pre class="code">GET https://ff.uniqbd.com/api/reseller/v1/order/{order_id}
+GET https://ff.uniqbd.com/api/reseller/v1/balance
+GET https://ff.uniqbd.com/api/reseller/v1/packages</pre>
 
           <div class="doc-h3">6. Auto-Complete Webhook Payload &amp; HMAC-SHA256 Verification</div>
           <pre class="code">{
@@ -475,7 +475,7 @@ X-API-Key: ${apiKey}
 X-API-Secret: YOUR_API_SECRET`;
 
       document.getElementById('docOrderCurl').textContent =
-`curl -X POST https://api.arorashop.com/api/reseller/v1/order \\
+`curl -X POST https://ff.uniqbd.com/api/reseller/v1/order \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: ${apiKey}" \\
   -H "X-API-Secret: YOUR_API_SECRET" \\
@@ -490,7 +490,7 @@ X-API-Secret: YOUR_API_SECRET`;
 `$response = Http::withHeaders([
     'X-API-Key'    => '${apiKey}',
     'X-API-Secret' => env('ARORA_API_SECRET'),
-])->post('https://api.arorashop.com/api/reseller/v1/order', [
+])->post('https://ff.uniqbd.com/api/reseller/v1/order', [
     'order_id'     => $order->id,
     'player_uid'   => $order->player_uid,
     'package_code' => 'FF_25D',
@@ -498,7 +498,7 @@ X-API-Secret: YOUR_API_SECRET`;
 ]);`;
 
       document.getElementById('docOrderNode').textContent =
-`const res = await axios.post('https://api.arorashop.com/api/reseller/v1/order', {
+`const res = await axios.post('https://ff.uniqbd.com/api/reseller/v1/order', {
   order_id: 'ORD-10045',
   player_uid: '1234567890',
   package_code: 'FF_25D',

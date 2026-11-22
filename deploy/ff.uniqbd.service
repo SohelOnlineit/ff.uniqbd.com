@@ -1,0 +1,19 @@
+[Unit]
+Description=ff.uniqbd.com website
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=amarpin
+Group=amarpin
+WorkingDirectory=/var/www/ff.uniqbd.com
+Environment=NODE_ENV=production
+EnvironmentFile=/var/www/ff.uniqbd.com/.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

@@ -162,12 +162,12 @@
         <h2>1. Quick Start Overview</h2>
         <p>Connect your top-up website to <b>AroraShop Auto-Delivery API</b> in 3 simple steps:</p>
         <ol>
-          <li><b>Get Credentials:</b> Log in to your Partner Dashboard at <a href="/user/login">https://api.arorashop.com/user/login</a> → open <b>API Keys, Webhook &amp; Telegram</b> to copy your <code>X-API-Key</code> and <code>X-API-Secret</code>.</li>
+          <li><b>Get Credentials:</b> Log in to your Partner Dashboard at <a href="/user/login">https://ff.uniqbd.com/user/login</a> → open <b>API Keys, Webhook &amp; Telegram</b> to copy your <code>X-API-Key</code> and <code>X-API-Secret</code>.</li>
           <li><b>Top-Up Wallet (BDT):</b> Top up your BDT wallet instantly from your dashboard via <b>bKash / Nagad / Rocket / Upay</b> (<code>pay.arorashop.com</code>) and check your custom BDT diamond price list.</li>
           <li><b>Send Order + Receive Webhook:</b> When a customer pays on your website, call <code>POST /api/reseller/v1/order</code>. Our engine delivers the diamonds automatically and sends a signed <code>POST</code> callback to your <b>Webhook URL</b> so your website marks the order <b>COMPLETED</b> automatically!</li>
         </ol>
         <div class="note-box">
-          <b>Base URL:</b> <code>https://api.arorashop.com</code> &nbsp;•&nbsp; All requests and responses use <code>application/json</code> over HTTPS.
+          <b>Base URL:</b> <code>https://ff.uniqbd.com</code> &nbsp;•&nbsp; All requests and responses use <code>application/json</code> over HTTPS.
         </div>
       </section>
 
@@ -210,7 +210,7 @@ X-API-Secret: arora_sec_your_api_secret_here</code></pre>
       <!-- 4. PLACE ORDER API -->
       <section class="card" id="place-order">
         <h2>4. Place a Top-Up Order</h2>
-        <div class="endpoint"><span class="badge post">POST</span> https://api.arorashop.com/api/reseller/v1/order</div>
+        <div class="endpoint"><span class="badge post">POST</span> https://ff.uniqbd.com/api/reseller/v1/order</div>
         <p>Call this immediately after your customer completes payment on your website. <code>order_id</code> is idempotent — sending the same <code>order_id</code> twice will never double-deliver or double-charge.</p>
 
         <h3>Request Body (JSON)</h3>
@@ -257,7 +257,7 @@ X-API-Secret: arora_sec_your_api_secret_here</code></pre>
 $response = Http::timeout(15)->withHeaders([
     'X-API-Key'    => env('ARORA_API_KEY'),
     'X-API-Secret' => env('ARORA_API_SECRET'),
-])->post('https://api.arorashop.com/api/reseller/v1/order', [
+])->post('https://ff.uniqbd.com/api/reseller/v1/order', [
     'order_id'     => (string) $order->id,
     'player_uid'   => (string) $order->player_uid,
     'package_code' => 'FF_25D',
@@ -282,7 +282,7 @@ $payload = json_encode([
     'quantity'     => 1,
 ]);
 
-$ch = curl_init('https://api.arorashop.com/api/reseller/v1/order');
+$ch = curl_init('https://ff.uniqbd.com/api/reseller/v1/order');
 curl_setopt_array($ch, [
     CURLOPT_POST           => true,
     CURLOPT_RETURNTRANSFER => true,
@@ -303,7 +303,7 @@ print_r($result);</code></pre>
           <button class="copy-btn" onclick="copyCode(this)">Copy</button>
           <pre><code>const axios = require('axios');
 
-const { data } = await axios.post('https://api.arorashop.com/api/reseller/v1/order', {
+const { data } = await axios.post('https://ff.uniqbd.com/api/reseller/v1/order', {
   order_id: 'ORD-10045',
   player_uid: '1234567890',
   package_code: 'FF_25D',
@@ -323,7 +323,7 @@ console.log(data);</code></pre>
           <pre><code>import requests
 
 res = requests.post(
-    'https://api.arorashop.com/api/reseller/v1/order',
+    'https://ff.uniqbd.com/api/reseller/v1/order',
     json={
         'order_id': 'ORD-10045',
         'player_uid': '1234567890',
@@ -341,7 +341,7 @@ print(res.status_code, res.json())</code></pre>
 
         <div id="ord-curl" class="code-wrap hidden">
           <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-          <pre><code>curl -X POST https://api.arorashop.com/api/reseller/v1/order \
+          <pre><code>curl -X POST https://ff.uniqbd.com/api/reseller/v1/order \
   -H "Content-Type: application/json" \
   -H "X-API-Key: arora_live_YOUR_KEY" \
   -H "X-API-Secret: arora_sec_YOUR_SECRET" \
@@ -352,9 +352,9 @@ print(res.status_code, res.json())</code></pre>
       <!-- 5. STATUS & BALANCE -->
       <section class="card" id="status-balance">
         <h2>5. Check Order Status, Wallet Balance &amp; Prices</h2>
-        <div class="endpoint"><span class="badge get">GET</span> https://api.arorashop.com/api/reseller/v1/order/{order_id}</div>
-        <div class="endpoint"><span class="badge get">GET</span> https://api.arorashop.com/api/reseller/v1/balance</div>
-        <div class="endpoint"><span class="badge get">GET</span> https://api.arorashop.com/api/reseller/v1/packages</div>
+        <div class="endpoint"><span class="badge get">GET</span> https://ff.uniqbd.com/api/reseller/v1/order/{order_id}</div>
+        <div class="endpoint"><span class="badge get">GET</span> https://ff.uniqbd.com/api/reseller/v1/balance</div>
+        <div class="endpoint"><span class="badge get">GET</span> https://ff.uniqbd.com/api/reseller/v1/packages</div>
         <p>Example response from <code>GET /api/reseller/v1/balance</code>:</p>
         <div class="code-wrap">
           <button class="copy-btn" onclick="copyCode(this)">Copy</button>
