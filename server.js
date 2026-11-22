@@ -81,6 +81,66 @@ function dbError(err) {
   return detail.split('\n').find((line) => line.trim()) || 'database command failed';
 }
 
+function maskEmail(email) {
+  const value = String(email || '').trim().toLowerCase();
+  const at = value.indexOf('@');
+  if (at < 1) return '***';
+  return value.slice(0, Math.min(2, at)) + '***' + value.slice(at);
+}
+
+function encryptSecret(plain) {
+  const key = crypto.scryptSync(authSecret, 'ff-account-v1', 32);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const enc = Buffer.concat([cipher.update(String(plain), 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return ['aes256gcm', iv.toString('base64url'), tag.toString('base64url'), enc.toString('base64url')].join('$');
+}
+
+function money(value, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.round(n * 100) / 100;
+}
+
+function saveAccount(body) {
+  const label = String(body.label || '').trim().slice(0, 80);
+  const email = String(body.email || '').trim().toLowerCase().slice(0, 200);
+  const password = String(body.password_or_pin || '');
+  const pin = String(body.security_pin || '').trim();
+  const balance = money(body.balance, 0);
+  const low = money(body.low_balance_threshold, 200);
+  if (!label || !email.includes('@') || !password || password.length > 200 || !/^\d{6}$/.test(pin)) {
+    return { ok: false, error: 'Check email, password, and 6-digit PIN.' };
+  }
+  pg(`INSERT INTO unipin_loaded_accounts
+      (label, email_encrypted, credentials_encrypted, masked_email, balance, low_balance_threshold, status, security_pin_encrypted, initial_balance)
+      VALUES (
+        ${sqlString(label)},
+        ${sqlString(encryptSecret(email))},
+        ${sqlString(encryptSecret(password))},
+        ${sqlString(maskEmail(email))},
+        ${balance},
+        ${low},
+        'active',
+        ${sqlString(encryptSecret(pin))},
+        ${balance}
+      )`);
+  return { ok: true };
+}
+
+function editAccount(id, body) {
+  const balance = money(body.balance, null);
+  const low = money(body.low_balance_threshold, null);
+  const status = body.status === 'paused' ? 'paused' : 'active';
+  if (balance === null || low === null) return { ok: false };
+  const saved = pg(`UPDATE unipin_loaded_accounts
+      SET balance = ${balance}, low_balance_threshold = ${low}, status = ${sqlString(status)}
+      WHERE id = ${id}
+      RETURNING id`);
+  return { ok: saved === String(id) };
+}
+
 function pg(sql) {
   const out = execFileSync(psqlBin, [
     '-h', process.env.PGHOST || '127.0.0.1',
@@ -94,7 +154,9 @@ function pg(sql) {
     encoding: 'utf8',
     maxBuffer: 20 * 1024 * 1024,
   });
-  return out.trim();
+  const lines = out.split(/\r?\n/).filter((line) => line.length);
+  if (lines.length && /^(INSERT|UPDATE|DELETE)\s/.test(lines[lines.length - 1])) lines.pop();
+  return lines.join('\n').trim();
 }
 
 function pgJson(sql) {
@@ -292,6 +354,30 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, dashboard());
     } catch (err) {
       console.error('dashboard failed:', dbError(err));
+      return sendJson(res, 500, { ok: false });
+    }
+  }
+
+  const accountMatch = pathname.match(/^\/admin-api\/accounts(?:\/(\d+))?$/);
+  if (accountMatch) {
+    if (!readToken(req)) return sendJson(res, 401, { ok: false });
+    const id = accountMatch[1] ? Number(accountMatch[1]) : 0;
+    try {
+      if (req.method === 'POST' && !id) {
+        const result = saveAccount(JSON.parse(await readBody(req) || '{}'));
+        return sendJson(res, result.ok ? 200 : 400, result);
+      }
+      if (req.method === 'PUT' && id) {
+        const result = editAccount(id, JSON.parse(await readBody(req) || '{}'));
+        return sendJson(res, result.ok ? 200 : 404, result);
+      }
+      if (req.method === 'DELETE' && id) {
+        const removed = pg('DELETE FROM unipin_loaded_accounts WHERE id = ' + id + ' RETURNING id');
+        return sendJson(res, removed === String(id) ? 200 : 404, { ok: removed === String(id) });
+      }
+      return sendJson(res, 405, { ok: false });
+    } catch (err) {
+      console.error('account action failed:', dbError(err));
       return sendJson(res, 500, { ok: false });
     }
   }

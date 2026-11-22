@@ -781,6 +781,12 @@
       if (name === 'vouchers') loadVouchers();
     }
 
+    function esc(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+      }[ch]));
+    }
+
     async function api(url, opts = {}) {
       const savedToken = localStorage.getItem('arora_admin_token') || '';
       const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
@@ -915,12 +921,12 @@
         : d.accounts.map((a) => `
           <tr>
             <td>
-              <b>${a.label}</b><br/>
+              <b>${esc(a.label)}</b><br/>
               <span class="pill ${a.has_security_pin ? 'pill-green' : 'pill-red'}" style="margin-top:4px;">
                 ${ICONS.lock} ${a.has_security_pin ? 'PIN Set' : 'No PIN'}
               </span>
             </td>
-            <td>${a.masked_email}</td>
+            <td>${esc(a.masked_email)}</td>
             <td><input type="number" step="0.01" id="abal_${a.id}" value="${a.balance}" style="width:94px;padding:6px 8px;" /></td>
             <td>
               <select id="ast_${a.id}" style="width:94px;padding:6px 8px;">
