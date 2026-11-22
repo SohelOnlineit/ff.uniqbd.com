@@ -781,6 +781,12 @@
       if (name === 'vouchers') loadVouchers();
     }
 
+    function maskSecret(value) {
+      const key = String(value || '');
+      if (key.length <= 4) return key ? '****' : '';
+      return key.slice(0, 4) + '*'.repeat(key.length - 4);
+    }
+
     function esc(value) {
       return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -983,7 +989,9 @@
         }).join('');
 
       const s = d.security_info;
-      document.getElementById('extKeyBox').value = s.extension_key || '';
+      const keyBox = document.getElementById('extKeyBox');
+      keyBox.value = maskSecret(s.extension_key);
+      keyBox.dataset.full = s.extension_key || '';
       document.getElementById('secInfoList').innerHTML = `
         <li class="sec-row"><span>${ICONS.lock} Encryption</span><span class="pill pill-green">${s.encryption}</span></li>
         <li class="sec-row"><span>${ICONS.shield} API Auth</span><span class="pill pill-green">${s.auth_scheme}</span></li>
@@ -1174,7 +1182,7 @@
     }
 
     function copyExtKey() {
-      const val = document.getElementById('extKeyBox').value;
+      const val = document.getElementById('extKeyBox').dataset.full || '';
       if (!val) return;
       navigator.clipboard.writeText(val);
       showToast('Extension Key copied!');
