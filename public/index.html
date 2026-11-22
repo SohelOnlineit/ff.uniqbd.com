@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="/logo.png" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>AroraShop API</title>
+  <style>
+    :root {
+      --bg: #090d12;
+      --surface: #111720;
+      --surface-2: #17202c;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.14);
+      --text: #f1f5f9;
+      --muted: #8b9bb0;
+      --accent: #15b48b;
+      --accent-hover: #119b77;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --info: #3b82f6;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.45;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .hidden { display: none !important; }
+    .container { max-width: 1220px; margin: 0 auto; padding: 18px 16px 40px; }
+
+    /* SVG Icon helper */
+    .ico {
+      width: 15px;
+      height: 15px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex-shrink: 0;
+    }
+    .ico-sm { width: 13px; height: 13px; }
+    .ico-lg { width: 18px; height: 18px; }
+
+    /* Login */
+    .login-wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .login-card {
+      width: 100%;
+      max-width: 370px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 26px 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+    }
+    .login-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .brand-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: rgba(21, 180, 139, 0.14);
+      border: 1px solid rgba(21, 180, 139, 0.35);
+      color: var(--accent);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-card h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+    .login-sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+
+    /* Form Controls */
+    .field { margin-bottom: 13px; }
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 5px;
+      font-weight: 600;
+    }
+    input, select, textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    textarea { min-height: 112px; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 13px; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+      white-space: nowrap;
+      touch-action: manipulation;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--border-strong); }
+    .btn-danger { background: rgba(239, 68, 68, 0.13); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .btn-danger:hover { background: rgba(239, 68, 68, 0.22); }
+    .btn-sm { padding: 7px 11px; font-size: 12px; border-radius: 8px; }
+    .w-full { width: 100%; }
+
+    /* Topbar */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: #111720;
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+    }
+    .topbar-inner {
+      max-width: 1220px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .topbar-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .topbar-title { font-size: 15px; font-weight: 700; white-space: nowrap; }
+    .topbar-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .dot-live {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      display: inline-block;
+    }
+    .topbar-actions { display: flex; gap: 7px; align-items: center; }
+
+    /* KPI Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin: 16px 0 18px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 15px;
+    }
+    .stat-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    .stat-val { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+    .c-green { color: var(--accent); }
+    .c-amber { color: var(--warn); }
+    .c-blue { color: var(--info); }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: var(--surface);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 13px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
+    }
+    .tab-btn:hover { color: var(--text); border-color: var(--border-strong); }
+    .tab-btn.active {
+      background: rgba(21, 180, 139, 0.14);
+      color: var(--accent);
+      border-color: rgba(21, 180, 139, 0.45);
+    }
+
+    /* Cards & Grid */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .card-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .card-sub { font-size: 12px; color: var(--muted); }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* Tables */
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td {
+      text-align: left;
+      padding: 10px 10px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    code {
+      background: rgba(255, 255, 255, 0.06);
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #a7f3d0;
+    }
+
+    /* Badges */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .pill-green { background: rgba(21, 180, 139, 0.15); color: #34d399; }
+    .pill-amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+    .pill-red { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+    .pill-blue { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+
+    .sec-list { list-style: none; display: flex; flex-direction: column; gap: 11px; }
+    .sec-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 13px;
+    }
+    .sec-row span:first-child { color: var(--muted); display: inline-flex; align-items: center; gap: 7px; }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 18px;
+      right: 18px;
+      left: auto;
+      background: var(--surface-2);
+      border: 1px solid var(--accent);
+      color: var(--text);
+      padding: 11px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      z-index: 9999;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+      max-width: 340px;
+    }
+
+    /* Responsive Mobile Polish */
+    @media (max-width: 960px) {
+      .stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      .container { padding: 14px 12px 32px; }
+      .topbar { padding: 10px 12px; }
+      .topbar-title { font-size: 14px; }
+      .btn-label-hide { display: none; }
+      .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+      .stat-card:last-child { grid-column: 1 / -1; }
+      .stat-val { font-size: 20px; }
+      .card { padding: 14px 12px; }
+      input, select, textarea { font-size: 16px; }
+      .toast { left: 12px; right: 12px; bottom: 14px; max-width: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- LOGIN VIEW -->
+  <div id="loginView" class="login-wrap hidden">
+    <div class="login-card">
+      <div class="login-head" style="justify-content:center;">
+        <img src="/logo.png" alt="AroraShop" style="height:40px;width:auto;display:block;object-fit:contain;" />
+      </div>
+      <p class="login-sub">Private Admin Sign In</p>
+
+      <form id="loginForm">
+        <div class="field">
+          <label for="loginUser">Username</label>
+          <input type="text" id="loginUser" required autocomplete="username" placeholder="Enter username" />
+        </div>
+        <div class="field">
+          <label for="loginPass">Password</label>
+          <input type="password" id="loginPass" required autocomplete="current-password" placeholder="Enter password" />
+        </div>
+        <div id="loginErr" style="color:#f87171;font-size:12px;margin-bottom:10px;"></div>
+        <button type="submit" class="btn btn-primary w-full">
+          <svg class="ico" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          Sign In
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- DASHBOARD VIEW -->
+  <div id="appView" class="hidden">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="topbar-brand">
+          <img src="/logo.png" alt="AroraShop" style="height:34px;width:auto;display:block;object-fit:contain;" />
+          <div>
+            <div class="topbar-title">API Engine</div>
+            <div class="topbar-status"><span class="dot-live"></span> Secure Engine</div>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span id="extLiveBadge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:700;background:rgba(239,68,68,.14);color:#f87171;border:1px solid rgba(239,68,68,.35);">
+            <span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
+            Extension Offline
+          </span>
+          <a href="/docs" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none;" title="Public API & Webhook Documentation">
+            <span class="btn-label-hide">API Docs</span>
+          </a>
+          <a href="/admin" class="btn btn-primary btn-sm" style="text-decoration:none;" title="Manage API Resellers & Users">
+            <span class="btn-label-hide">Reseller Admin</span>
+          </a>
+          <button class="btn btn-secondary btn-sm" onclick="testTelegram()" title="Test Telegram">
+            <svg class="ico ico-sm" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            <span class="btn-label-hide">Telegram</span>
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="loadDashboard()" title="Refresh">
+            <svg class="ico ico-sm" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            <span class="btn-label-hide">Refresh</span>
+          </button>
+          <button class="btn btn-danger btn-sm" onclick="logout()" title="Logout">
+            <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span class="btn-label-hide">Logout</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <!-- KPI Stats -->
+      <section class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-top">
+            <span>Total Orders</span>
+            <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg>
+          </div>
+          <div class="stat-val" id="stTotal">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-top">
+            <span>Completed</span>
+            <svg class="ico ico-sm c-green" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div class="stat-val c-green" id="stDone">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-top">
+            <span>Processing</span>
+            <svg class="ico ico-sm c-amber" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="stat-val c-amber" id="stProc">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-top">
+            <span>Token Stock</span>
+            <svg class="ico ico-sm c-blue" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          </div>
+          <div class="stat-val c-blue" id="stTokens">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-top">
+            <span>Account Balance (UP)</span>
+            <svg class="ico ico-sm c-green" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          </div>
+          <div class="stat-val c-green" id="stBal">0</div>
+        </div>
+      </section>
+
+      <!-- Tabs -->
+      <nav class="tabs" aria-label="Dashboard Sections">
+        <button class="tab-btn active" onclick="switchTab('orders', this)">
+          <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Orders
+        </button>
+        <button class="tab-btn" onclick="switchTab('vouchers', this)">
+          <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/></svg>
+          Tokens
+        </button>
+        <button class="tab-btn" onclick="switchTab('accounts', this)">
+          <svg class="ico ico-sm" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          Accounts
+        </button>
+        <button class="tab-btn" onclick="switchTab('packages', this)">
+          <svg class="ico ico-sm" viewBox="0 0 24 24"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+          Packages
+        </button>
+        <button class="tab-btn" onclick="switchTab('security', this)">
+          <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Security & Test
+        </button>
+      </nav>
+
+      <!-- TAB 1: ORDERS -->
+      <section id="tab-orders" class="tab-pane">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">
+              <svg class="ico" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              Recent Orders
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="card-sub">Auto & Manual Queue</span>
+              <button type="button" class="btn btn-danger btn-sm" onclick="clearPendingOrders()" title="Delete all non-completed orders">
+                <svg class="ico ico-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                Clear All Pending
+              </button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Player UID</th>
+                  <th>Package</th>
+                  <th>Method</th>
+                  <th>Status</th>
+                  <th>Note</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="ordersBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: TOKENS -->
+      <section id="tab-vouchers" class="tab-pane hidden">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">
+                <svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Add UniPin Tokens
+              </div>
+              <span class="card-sub">No PIN needed</span>
+            </div>
+            <form id="voucherForm">
+              <div class="field">
+                <label for="vPkgCode">Package</label>
+                <select id="vPkgCode" required></select>
+              </div>
+              <div class="field">
+                <label for="vTokensText">Tokens (one per line)</label>
+                <textarea id="vTokensText" placeholder="UPBD-XXXX-XXXX-1111&#10;UPBD-XXXX-XXXX-2222"></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary w-full">
+                <svg class="ico ico-sm" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Encrypt & Save Stock
+              </button>
+            </form>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">
+                <svg class="ico" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                Stock Summary
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Package</th>
+                    <th>Code</th>
+                    <th>Available</th>
+                    <th>Used</th>
+                  </tr>
+                </thead>
+                <tbody id="voucherSummaryBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">
+              <svg class="ico" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Stored Tokens
+            </div>
+            <span class="card-sub">Masked for security</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Token</th>
+                  <th>Status</th>
+                  <th>Order ID</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="vouchersListBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: ACCOUNTS -->
+      <section id="tab-accounts" class="tab-pane hidden">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">
+                <svg class="ico" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                Add Loaded Account
+              </div>
+              <span class="card-sub">AES-256 Encrypted</span>
+            </div>
+            <form id="accountForm">
+              <div class="field">
+                <label for="accLabel">Account Name</label>
+                <input type="text" id="accLabel" required placeholder="Main UniPin #1" />
+              </div>
+              <div class="field">
+                <label for="accEmail">Email</label>
+                <input type="email" id="accEmail" required placeholder="email@example.com" />
+              </div>
+              <div class="field">
+                <label for="accCred">Login Password</label>
+                <input type="password" id="accCred" required placeholder="Password" />
+              </div>
+              <div class="field">
+                <label for="accPin">6-Digit Security PIN</label>
+                <input type="password" id="accPin" required maxlength="6" pattern="[0-9]{6}" inputmode="numeric" placeholder="6-digit PIN" />
+              </div>
+              <div class="grid-2" style="gap:10px;">
+                <div class="field">
+                  <label for="accBal">Balance (UP)</label>
+                  <input type="number" step="0.01" id="accBal" required value="1000" />
+                </div>
+                <div class="field">
+                  <label for="accLow">Low Alert (UP)</label>
+                  <input type="number" step="1" id="accLow" required value="200" />
+                </div>
+              </div>
+              <button type="submit" class="btn btn-primary w-full">
+                <svg class="ico ico-sm" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Save Account
+              </button>
+            </form>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">
+                <svg class="ico" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                Loaded Accounts
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Account</th>
+                    <th>Email</th>
+                    <th>Balance (UP)</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="accountsBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: PACKAGES -->
+      <section id="tab-packages" class="tab-pane hidden">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">
+              <svg class="ico" viewBox="0 0 24 24"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+              Package Identifiers
+            </div>
+            <span class="card-sub">Synced with arorashop.com</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Service ID</th>
+                  <th>Name</th>
+                  <th>UP Cost</th>
+                  <th>Low Limit</th>
+                  <th>Stock</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="packagesBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: SECURITY & TEST -->
+      <section id="tab-security" class="tab-pane hidden">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">
+                <svg class="ico" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Order Simulator
+              </div>
+              <span class="card-sub">Test live flow</span>
+            </div>
+            <form id="testOrderForm">
+              <div class="field">
+                <label for="testPkgCode">Package</label>
+                <select id="testPkgCode"></select>
+              </div>
+              <div class="field">
+                <label for="testUid">Test Player UID</label>
+                <input type="text" id="testUid" value="1987654321" required />
+              </div>
+              <button type="submit" class="btn btn-primary w-full">
+                <svg class="ico ico-sm" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Run Test Order
+              </button>
+            </form>
+            <pre id="testOrderResult" style="margin-top:12px;background:#06090d;border:1px solid var(--border);padding:12px;border-radius:10px;font-size:12px;overflow:auto;display:none;"></pre>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">
+                <svg class="ico" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                Chrome Extension & Security
+              </div>
+              <a href="/arorashop-ff-extension.zip" download class="btn btn-primary btn-sm" style="text-decoration:none;">
+                <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download Extension (.zip)
+              </a>
+            </div>
+            <div class="field" style="margin-bottom:14px;">
+              <label>Extension Secret Key (Paste inside Extension Popup)</label>
+              <div style="display:flex;gap:8px;">
+                <input type="text" id="extKeyBox" readonly style="font-family:monospace;font-size:12px;" />
+                <button type="button" class="btn btn-secondary btn-sm" onclick="copyExtKey()">Copy Key</button>
+              </div>
+            </div>
+            <ul id="secInfoList" class="sec-list"></ul>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script>
+    const ICONS = {
+      check: '<svg class="ico ico-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>',
+      clock: '<svg class="ico ico-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+      ticket: '<svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/></svg>',
+      card: '<svg class="ico ico-sm" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>',
+      wrench: '<svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+      lock: '<svg class="ico ico-sm" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+      shield: '<svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+      globe: '<svg class="ico ico-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+      send: '<svg class="ico ico-sm" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>',
+      trash: '<svg class="ico ico-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
+      pause: '<svg class="ico ico-sm" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>',
+      play: '<svg class="ico ico-sm" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
+    };
+
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      setTimeout(() => el.classList.add('hidden'), 3500);
+    }
+
+    function switchTab(name, btn) {
+      document.querySelectorAll('.tab-pane').forEach((p) => p.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+      const pane = document.getElementById('tab-' + name);
+      if (pane) pane.classList.remove('hidden');
+      if (btn) {
+        btn.classList.add('active');
+      } else {
+        const matchBtn = document.querySelector(`.tab-btn[onclick*="'${name}'"]`);
+        if (matchBtn) matchBtn.classList.add('active');
+      }
+      localStorage.setItem('arora_active_tab', name);
+      if (name === 'vouchers') loadVouchers();
+    }
+
+    async function api(url, opts = {}) {
+      const savedToken = localStorage.getItem('arora_admin_token') || '';
+      const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+      if (savedToken) {
+        headers['Authorization'] = 'Bearer ' + savedToken;
+      }
+      const res = await fetch(url, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        ...opts,
+        headers,
+      });
+      return res.json();
+    }
+
+    async function checkAuth() {
+      // Optimistically show appView if token exists so refresh never flashes login
+      if (localStorage.getItem('arora_admin_token')) {
+        document.getElementById('loginView').classList.add('hidden');
+        document.getElementById('appView').classList.remove('hidden');
+      }
+      const me = await api('/admin-api/me');
+      if (me.ok) {
+        document.getElementById('loginView').classList.add('hidden');
+        document.getElementById('appView').classList.remove('hidden');
+        const lastTab = localStorage.getItem('arora_active_tab') || 'orders';
+        switchTab(lastTab, null);
+        loadDashboard();
+      } else {
+        localStorage.removeItem('arora_admin_token');
+        document.getElementById('appView').classList.add('hidden');
+        document.getElementById('loginView').classList.remove('hidden');
+      }
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      document.getElementById('loginErr').textContent = '';
+      const r = await api('/admin-api/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          username: document.getElementById('loginUser').value,
+          password: document.getElementById('loginPass').value,
+        }),
+      });
+      if (r.ok) {
+        if (r.token) localStorage.setItem('arora_admin_token', r.token);
+        checkAuth();
+      } else {
+        document.getElementById('loginErr').textContent = 'Invalid username or password.';
+      }
+    });
+
+    async function logout() {
+      localStorage.removeItem('arora_admin_token');
+      await api('/admin-api/logout', { method: 'POST' });
+      checkAuth();
+    }
+
+    let dashSig = '';
+    let dashBusy = false;
+    async function loadDashboard() {
+      if (dashBusy) return;
+      dashBusy = true;
+      try {
+      const d = await api('/admin-api/dashboard');
+      if (!d.ok) return;
+      const sig = JSON.stringify(d);
+      if (sig === dashSig) return;
+      dashSig = sig;
+
+      const extBadge = document.getElementById('extLiveBadge');
+      if (extBadge && d.extension_status) {
+        const isOnline = Boolean(d.extension_status.online);
+        const ago = d.extension_status.last_seen_at
+          ? Math.max(0, Math.floor((Date.now() - Number(d.extension_status.last_seen_at)) / 1000))
+          : null;
+        if (isOnline) {
+          extBadge.style.background = 'rgba(16,185,129,.16)';
+          extBadge.style.color = '#34d399';
+          extBadge.style.borderColor = 'rgba(16,185,129,.4)';
+          extBadge.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;box-shadow:0 0 8px #10b981;"></span> Extension Online (${ago !== null ? ago + 's ago' : 'Live'})`;
+        } else {
+          extBadge.style.background = 'rgba(239,68,68,.14)';
+          extBadge.style.color = '#f87171';
+          extBadge.style.borderColor = 'rgba(239,68,68,.35)';
+          const lastTxt = ago !== null ? (ago > 3600 ? Math.floor(ago/3600) + 'h ago' : Math.floor(ago/60) + 'm ago') : 'Never';
+          extBadge.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;"></span> Extension Offline (${lastTxt})`;
+        }
+      }
+
+      document.getElementById('stTotal').textContent = d.stats.total_orders;
+      document.getElementById('stDone').textContent = d.stats.completed_orders;
+      document.getElementById('stProc').textContent = d.stats.processing_orders;
+      document.getElementById('stTokens').textContent = d.stats.total_available_tokens;
+      document.getElementById('stBal').textContent = d.stats.total_account_balance;
+
+      const pkgOpts = d.packages
+        .map((p) => `<option value="${p.package_code}">${p.name} (${p.package_code}) — Stock: ${p.available_tokens}</option>`)
+        .join('');
+      document.getElementById('vPkgCode').innerHTML = pkgOpts;
+      document.getElementById('testPkgCode').innerHTML = pkgOpts;
+
+      document.getElementById('voucherSummaryBody').innerHTML = d.packages.map((p) => `
+        <tr>
+          <td><b>${p.name}</b></td>
+          <td><code>${p.package_code}</code></td>
+          <td><span class="pill ${p.available_tokens > p.low_stock_threshold ? 'pill-green' : 'pill-amber'}">${p.available_tokens}</span></td>
+          <td>${p.used_tokens}</td>
+        </tr>
+      `).join('');
+
+      document.getElementById('packagesBody').innerHTML = d.packages.map((p) => `
+        <tr style="${p.is_active ? '' : 'opacity:0.65;'}">
+          <td><code>${p.package_code}</code></td>
+          <td><input type="number" id="sid_${p.id}" value="${p.arora_service_id || ''}" style="width:82px;padding:6px 8px;" /></td>
+          <td><input type="text" id="pname_${p.id}" value="${p.name}" style="width:150px;padding:6px 8px;" /></td>
+          <td><input type="number" step="0.01" id="puc_${p.id}" value="${p.unipin_uc_cost}" style="width:88px;padding:6px 8px;" /></td>
+          <td><input type="number" id="plow_${p.id}" value="${p.low_stock_threshold}" style="width:72px;padding:6px 8px;" /></td>
+          <td><span class="pill pill-blue">${p.available_tokens}</span></td>
+          <td>
+            <button type="button" class="pill ${p.is_active ? 'pill-green' : 'pill-red'}" style="cursor:pointer;border:1px solid ${p.is_active ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'};" onclick="togglePackageActive(${p.id})" title="Click to toggle Active / Inactive">
+              ${p.is_active ? '● Active' : '○ Inactive'}
+            </button>
+          </td>
+          <td><button class="btn btn-primary btn-sm" onclick="savePackage(${p.id}, ${p.diamonds}, ${p.is_active ? 1 : 0})">Save</button></td>
+        </tr>
+      `).join('');
+
+      document.getElementById('accountsBody').innerHTML = d.accounts.length === 0
+        ? '<tr><td colspan="5" style="color:var(--muted);">No accounts added yet.</td></tr>'
+        : d.accounts.map((a) => `
+          <tr>
+            <td>
+              <b>${a.label}</b><br/>
+              <span class="pill ${a.has_security_pin ? 'pill-green' : 'pill-red'}" style="margin-top:4px;">
+                ${ICONS.lock} ${a.has_security_pin ? 'PIN Set' : 'No PIN'}
+              </span>
+            </td>
+            <td>${a.masked_email}</td>
+            <td><input type="number" step="0.01" id="abal_${a.id}" value="${a.balance}" style="width:94px;padding:6px 8px;" /></td>
+            <td>
+              <select id="ast_${a.id}" style="width:94px;padding:6px 8px;">
+                <option value="active" ${a.status === 'active' ? 'selected' : ''}>Active</option>
+                <option value="paused" ${a.status === 'paused' ? 'selected' : ''}>Paused</option>
+              </select>
+            </td>
+            <td style="display:flex;gap:6px;">
+              <button class="btn btn-primary btn-sm" onclick="updateAccount(${a.id}, ${a.low_balance_threshold})">Save</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteAccount(${a.id})" title="Delete">${ICONS.trash}</button>
+            </td>
+          </tr>
+        `).join('');
+
+      document.getElementById('ordersBody').innerHTML = d.orders.length === 0
+        ? '<tr><td colspan="7" style="color:var(--muted);">No orders yet.</td></tr>'
+        : d.orders.map((o) => {
+          const stBadge = o.status === 'COMPLETED'
+            ? `<span class="pill pill-green">${ICONS.check} Completed</span>`
+            : o.status === 'PAUSED'
+            ? `<span class="pill pill-red">${ICONS.pause} Paused</span>`
+            : o.status === 'QUEUED_EXT' || o.status === 'IN_PROGRESS_EXT'
+            ? `<span class="pill pill-blue">${ICONS.clock} Extension Queue</span>`
+            : `<span class="pill pill-amber">${ICONS.clock} Processing</span>`;
+          const mLabel = o.method_used === 'unipin_voucher'
+            ? `<span style="display:inline-flex;align-items:center;gap:5px;">${ICONS.ticket} Token</span>`
+            : o.method_used === 'loaded_account'
+            ? `<span style="display:inline-flex;align-items:center;gap:5px;">${ICONS.card} Account</span>`
+            : o.method_used === 'manual'
+            ? `<span style="display:inline-flex;align-items:center;gap:5px;">${ICONS.wrench} Manual</span>`
+            : `<span style="display:inline-flex;align-items:center;gap:5px;color:var(--muted);">${ICONS.clock} Pending</span>`;
+          const noteText = o.receipt_note || o.status_reason || '-';
+          const pauseBtnHtml = o.status === 'PAUSED'
+            ? `<button class="btn btn-secondary btn-sm" onclick="togglePauseOrder(${o.id})" title="Resume Order" style="border-color:rgba(59,130,246,0.45);color:#60a5fa;">${ICONS.play} Resume</button>`
+            : `<button class="btn btn-secondary btn-sm" onclick="togglePauseOrder(${o.id})" title="Pause Order" style="border-color:rgba(245,158,11,0.45);color:#fbbf24;">${ICONS.pause} Pause</button>`;
+          return `
+            <tr>
+              <td><code>${o.arora_order_utr}</code></td>
+              <td><code>${o.player_uid}</code></td>
+              <td><b>${o.package_name}</b> <code>${o.package_code}</code> ×${o.quantity}</td>
+              <td>${mLabel}</td>
+              <td>${stBadge}</td>
+              <td style="max-width:210px;overflow:hidden;text-overflow:ellipsis;color:var(--muted);" title="${noteText.replace(/"/g, '&quot;')}">${noteText}</td>
+              <td>
+                <div style="display:inline-flex;align-items:center;gap:6px;">
+                  ${o.status !== 'COMPLETED'
+                    ? `<button class="btn btn-secondary btn-sm" onclick="retryOrder(${o.id})" title="Retry Auto Delivery in Extension" style="border-color:rgba(56,189,248,0.45);color:#38bdf8;">↻ Retry</button><button class="btn btn-primary btn-sm" onclick="manualComplete(${o.id})" title="Mark Completed">${ICONS.check} Complete</button>${pauseBtnHtml}`
+                    : '<span style="color:var(--muted);font-size:12px;margin-right:4px;">Done</span>'}
+                  <button class="btn btn-danger btn-sm" onclick="deleteOrder(${o.id})" title="Delete Order">${ICONS.trash}</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+      const s = d.security_info;
+      document.getElementById('extKeyBox').value = s.extension_key || '';
+      document.getElementById('secInfoList').innerHTML = `
+        <li class="sec-row"><span>${ICONS.lock} Encryption</span><span class="pill pill-green">${s.encryption}</span></li>
+        <li class="sec-row"><span>${ICONS.shield} API Auth</span><span class="pill pill-green">${s.auth_scheme}</span></li>
+        <li class="sec-row"><span>${ICONS.globe} Allowed IPs</span><code>${s.allowed_ips}</code></li>
+        <li class="sec-row"><span>${ICONS.lock} Public Signup</span><span class="pill pill-green">Disabled</span></li>
+        <li class="sec-row"><span>${ICONS.send} Telegram Alerts</span><span class="pill ${s.telegram_connected ? 'pill-green' : 'pill-red'}">${s.telegram_connected ? 'Active' : 'Off'}</span></li>
+      `;
+      } finally {
+        dashBusy = false;
+      }
+    }
+
+    async function loadVouchers() {
+      const r = await api('/admin-api/vouchers');
+      if (!r.ok) return;
+      document.getElementById('vouchersListBody').innerHTML = r.vouchers.length === 0
+        ? '<tr><td colspan="5" style="color:var(--muted);">No tokens in stock.</td></tr>'
+        : r.vouchers.map((v) => `
+          <tr>
+            <td><code>${v.package_code}</code></td>
+            <td><code>${v.masked_code}</code></td>
+            <td><span class="pill ${v.status === 'available' ? 'pill-green' : 'pill-blue'}">${v.status === 'available' ? 'Available' : 'Used'}</span></td>
+            <td>${v.used_order_utr ? `<code>${v.used_order_utr}</code>` : '-'}</td>
+            <td>${v.status === 'available' ? `<button class="btn btn-danger btn-sm" onclick="delVoucher(${v.id})">${ICONS.trash}</button>` : '-'}</td>
+          </tr>
+        `).join('');
+    }
+
+    document.getElementById('voucherForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const r = await api('/admin-api/vouchers/bulk', {
+        method: 'POST',
+        body: JSON.stringify({
+          package_code: document.getElementById('vPkgCode').value,
+          tokens_text: document.getElementById('vTokensText').value,
+        }),
+      });
+      showToast(r.ok ? `Added ${r.added} token(s). Total stock: ${r.total_available}` : 'Failed to save tokens.');
+      if (r.ok) {
+        document.getElementById('vTokensText').value = '';
+        loadDashboard();
+        loadVouchers();
+      }
+    });
+
+    async function delVoucher(id) {
+      if (!confirm('Delete this token?')) return;
+      const r = await api('/admin-api/vouchers/' + id, { method: 'DELETE' });
+      showToast(r.ok ? 'Token deleted.' : 'Delete failed.');
+      loadDashboard();
+      loadVouchers();
+    }
+
+    document.getElementById('accountForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const r = await api('/admin-api/accounts', {
+        method: 'POST',
+        body: JSON.stringify({
+          label: document.getElementById('accLabel').value,
+          email: document.getElementById('accEmail').value,
+          password_or_pin: document.getElementById('accCred').value,
+          security_pin: document.getElementById('accPin').value,
+          balance: document.getElementById('accBal').value,
+          low_balance_threshold: document.getElementById('accLow').value,
+        }),
+      });
+      showToast(r.ok ? 'Account saved securely.' : 'Check email, password, and 6-digit PIN.');
+      if (r.ok) {
+        document.getElementById('accountForm').reset();
+        loadDashboard();
+      }
+    });
+
+    async function updateAccount(id, low) {
+      const r = await api('/admin-api/accounts/' + id, {
+        method: 'PUT',
+        body: JSON.stringify({
+          balance: document.getElementById('abal_' + id).value,
+          status: document.getElementById('ast_' + id).value,
+          low_balance_threshold: low,
+        }),
+      });
+      showToast(r.ok ? 'Account updated.' : 'Update failed.');
+      loadDashboard();
+    }
+
+    async function deleteAccount(id) {
+      if (!confirm('Delete this account?')) return;
+      const r = await api('/admin-api/accounts/' + id, { method: 'DELETE' });
+      showToast(r.ok ? 'Account deleted.' : 'Delete failed.');
+      loadDashboard();
+    }
+
+    async function savePackage(id, diamonds, isActive = 1) {
+      const r = await api('/admin-api/packages/' + id, {
+        method: 'PUT',
+        body: JSON.stringify({
+          arora_service_id: document.getElementById('sid_' + id).value,
+          name: document.getElementById('pname_' + id).value,
+          diamonds,
+          unipin_uc_cost: document.getElementById('puc_' + id).value,
+          low_stock_threshold: document.getElementById('plow_' + id).value,
+          is_active: isActive ? 1 : 0,
+        }),
+      });
+      showToast(r.ok ? 'Package saved.' : 'Save failed.');
+      loadDashboard();
+    }
+
+    async function togglePackageActive(id) {
+      const r = await api('/admin-api/packages/' + id + '/toggle', { method: 'POST', body: JSON.stringify({}) });
+      showToast(r.ok ? (r.message || 'Package status updated.') : (r.error || 'Toggle failed.'));
+      loadDashboard();
+    }
+
+    async function manualComplete(id) {
+      const note = prompt('Delivery receipt / note (optional):', 'Delivered manually');
+      if (note === null) return;
+      const r = await api(`/admin-api/orders/${id}/complete`, {
+        method: 'POST',
+        body: JSON.stringify({ receipt_note: note }),
+      });
+      showToast(r.ok ? 'Order marked completed.' : 'Action failed.');
+      loadDashboard();
+    }
+
+    async function retryOrder(id) {
+      if (!confirm('Re-queue this order for Chrome Extension auto-delivery?')) return;
+      const r = await api(`/admin-api/orders/${id}/retry`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      if (r.ok) {
+        toast(r.message || 'Order re-queued for Extension retry!');
+        loadDashboard();
+      } else {
+        toast(r.error || 'Retry failed.', true);
+      }
+    }
+
+    async function togglePauseOrder(id) {
+      const r = await api(`/admin-api/orders/${id}/toggle-pause`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      showToast(r.ok ? (r.message || 'Order updated.') : (r.error || 'Action failed.'));
+      loadDashboard();
+    }
+
+    async function deleteOrder(id) {
+      const r = await api(`/admin-api/orders/${id}/delete`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      showToast(r.ok ? 'Order deleted.' : (r.error || 'Delete failed.'));
+      loadDashboard();
+    }
+
+    async function clearPendingOrders() {
+      const r = await api('/admin-api/orders/clear-pending', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      showToast(r.ok ? (r.message || 'Pending orders cleared.') : (r.error || 'Clear failed.'));
+      loadDashboard();
+    }
+
+    document.getElementById('testOrderForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const r = await api('/admin-api/test-order', {
+        method: 'POST',
+        body: JSON.stringify({
+          package_code: document.getElementById('testPkgCode').value,
+          player_uid: document.getElementById('testUid').value,
+          quantity: 1,
+        }),
+      });
+      const pre = document.getElementById('testOrderResult');
+      pre.style.display = 'block';
+      pre.textContent = JSON.stringify(r, null, 2);
+      showToast(r.status === 'COMPLETED' ? 'Order completed!' : 'Order set to Processing.');
+      loadDashboard();
+    });
+
+    async function testTelegram() {
+      const r = await api('/admin-api/test-telegram', { method: 'POST' });
+      showToast(r.ok ? 'Telegram test alert sent.' : 'Telegram failed.');
+    }
+
+    function copyExtKey() {
+      const val = document.getElementById('extKeyBox').value;
+      if (!val) return;
+      navigator.clipboard.writeText(val);
+      showToast('Extension Key copied!');
+    }
+
+    checkAuth();
+  </script>
+</body>
+</html>

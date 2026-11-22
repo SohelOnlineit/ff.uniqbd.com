@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="/logo.png" />
+  <title>AroraShop API — Public Integration &amp; Webhook Documentation</title>
+  <style>
+    :root {
+      --bg: #070b10;
+      --surface: #0f1620;
+      --surface2: #151f2d;
+      --border: #223044;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #00e699;
+      --accent-dark: #00b87a;
+      --info: #38bdf8;
+      --warn: #fbbf24;
+      --danger: #f87171;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    .topbar {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 40;
+    }
+    .topbar-inner {
+      max-width: 1180px; margin: 0 auto; padding: 14px 20px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-badge {
+      width: 38px; height: 38px; border-radius: 10px;
+      background: linear-gradient(135deg, #00e699, #0099ff);
+      display: flex; align-items: center; justify-content: center; font-weight: 900; color: #051014;
+    }
+    .brand h1 { font-size: 16px; font-weight: 800; }
+    .brand small { color: var(--muted); font-size: 12px; display: block; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px;
+      border-radius: 8px; border: 1px solid var(--border); background: var(--surface2);
+      color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; transition: .15s;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .btn-primary { background: var(--accent); color: #04120d; border-color: var(--accent); }
+    .layout {
+      max-width: 1180px; margin: 0 auto; padding: 26px 20px 80px;
+      display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 26px;
+    }
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+    }
+    .sidebar {
+      position: sticky; top: 82px; align-self: start;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px;
+    }
+    .sidebar h4 { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 10px; }
+    .sidebar a {
+      display: block; padding: 7px 10px; border-radius: 7px; font-size: 13px; color: #cbd5e1; font-weight: 600; margin-bottom: 3px;
+    }
+    .sidebar a:hover { background: var(--surface2); color: var(--accent); }
+    .card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      padding: 22px; margin-bottom: 22px;
+    }
+    h2 { font-size: 20px; font-weight: 800; margin-bottom: 10px; color: var(--text); }
+    h3 { font-size: 15px; font-weight: 800; color: var(--accent); margin: 18px 0 8px; }
+    p { font-size: 13.5px; color: #cbd5e1; margin-bottom: 10px; }
+    ul, ol { margin: 8px 0 14px 20px; font-size: 13.5px; color: #cbd5e1; }
+    li { margin-bottom: 5px; }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 800;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin-right: 6px;
+    }
+    .post { background: rgba(0,230,153,.15); color: #34d399; border: 1px solid rgba(0,230,153,.35); }
+    .get { background: rgba(56,189,248,.15); color: #38bdf8; border: 1px solid rgba(56,189,248,.35); }
+    .endpoint {
+      display: flex; align-items: center; gap: 8px; background: var(--surface2);
+      border: 1px solid var(--border); padding: 10px 14px; border-radius: 9px; margin: 10px 0 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; overflow-x: auto;
+    }
+    .code-wrap { position: relative; margin: 10px 0 18px; }
+    .copy-btn {
+      position: absolute; top: 8px; right: 8px; padding: 4px 9px; border-radius: 6px;
+      background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+      font-size: 11px; font-weight: 700; cursor: pointer;
+    }
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+    pre {
+      background: #05080d; border: 1px solid var(--border); border-radius: 10px;
+      padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.6;
+      color: #e2e8f0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    code {
+      background: rgba(148,163,184,.14); padding: 2px 6px; border-radius: 5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #7dd3fc;
+    }
+    pre code { background: none; padding: 0; color: inherit; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0 14px; }
+    th, td { padding: 9px 12px; border-bottom: 1px solid var(--border); text-align: left; }
+    th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+    .tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+    .tab-btn {
+      padding: 6px 12px; border-radius: 7px; border: 1px solid var(--border);
+      background: var(--surface2); color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer;
+    }
+    .tab-btn.active { background: var(--accent); color: #04120d; border-color: var(--accent); }
+    .hidden { display: none !important; }
+    .note-box {
+      background: rgba(56,189,248,.08); border: 1px solid rgba(56,189,248,.3);
+      border-radius: 10px; padding: 12px 14px; font-size: 13px; color: #bae6fd; margin: 12px 0;
+    }
+    .warn-box {
+      background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.35);
+      border-radius: 10px; padding: 12px 14px; font-size: 13px; color: #fde68a; margin: 12px 0;
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <img src="/logo.png" alt="AroraShop" style="height:34px;width:auto;display:block;object-fit:contain;" />
+        <div>
+          <h1>AroraShop API Documentation</h1>
+          <small>Free Fire Auto-Delivery REST API v1 &amp; Auto-Complete Webhook Guide</small>
+        </div>
+      </div>
+      <div class="actions">
+        <a href="/user/login" class="btn btn-primary">Partner Login</a>
+        <a href="/admin" class="btn">Super Admin</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <h4>Contents</h4>
+      <a href="#quickstart">1. Quick Start</a>
+      <a href="#auth">2. Authentication</a>
+      <a href="#packages">3. Package Codes</a>
+      <a href="#place-order">4. Place Order API</a>
+      <a href="#status-balance">5. Status &amp; Balance</a>
+      <a href="#webhook-guide">6. Webhook Setup Guide</a>
+      <a href="#webhook-code">7. Webhook Code Examples</a>
+      <a href="#errors">8. Error Codes</a>
+    </aside>
+
+    <main>
+      <!-- 1. QUICK START -->
+      <section class="card" id="quickstart">
+        <h2>1. Quick Start Overview</h2>
+        <p>Connect your top-up website to <b>AroraShop Auto-Delivery API</b> in 3 simple steps:</p>
+        <ol>
+          <li><b>Get Credentials:</b> Log in to your Partner Dashboard at <a href="/user/login">https://api.arorashop.com/user/login</a> → open <b>API Keys, Webhook &amp; Telegram</b> to copy your <code>X-API-Key</code> and <code>X-API-Secret</code>.</li>
+          <li><b>Top-Up Wallet (BDT):</b> Top up your BDT wallet instantly from your dashboard via <b>bKash / Nagad / Rocket / Upay</b> (<code>pay.arorashop.com</code>) and check your custom BDT diamond price list.</li>
+          <li><b>Send Order + Receive Webhook:</b> When a customer pays on your website, call <code>POST /api/reseller/v1/order</code>. Our engine delivers the diamonds automatically and sends a signed <code>POST</code> callback to your <b>Webhook URL</b> so your website marks the order <b>COMPLETED</b> automatically!</li>
+        </ol>
+        <div class="note-box">
+          <b>Base URL:</b> <code>https://api.arorashop.com</code> &nbsp;•&nbsp; All requests and responses use <code>application/json</code> over HTTPS.
+        </div>
+      </section>
+
+      <!-- 2. AUTHENTICATION -->
+      <section class="card" id="auth">
+        <h2>2. Authentication Headers</h2>
+        <p>Include these two headers in every backend API request (never expose your <code>X-API-Secret</code> in frontend browser JavaScript):</p>
+        <div class="code-wrap">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre><code>Content-Type: application/json
+Accept: application/json
+X-API-Key: arora_live_your_api_key_here
+X-API-Secret: arora_sec_your_api_secret_here</code></pre>
+        </div>
+      </section>
+
+      <!-- 3. PACKAGE CODES -->
+      <section class="card" id="packages">
+        <h2>3. Free Fire Package Codes</h2>
+        <p>Use these exact <code>package_code</code> values when placing an order. You can also fetch your live custom BDT prices dynamically via <code>GET /api/reseller/v1/packages</code>.</p>
+        <table>
+          <thead>
+            <tr><th>Package Name</th><th><code>package_code</code></th><th>Diamonds</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>25 Diamond</td><td><code>FF_25D</code></td><td>25 💎</td></tr>
+            <tr><td>50 Diamond</td><td><code>FF_50D</code></td><td>50 💎</td></tr>
+            <tr><td>115 Diamond</td><td><code>FF_115D</code></td><td>115 💎</td></tr>
+            <tr><td>240 Diamond</td><td><code>FF_240D</code></td><td>240 💎</td></tr>
+            <tr><td>610 Diamond</td><td><code>FF_610D</code></td><td>610 💎</td></tr>
+            <tr><td>850 Diamond</td><td><code>FF_850D</code></td><td>850 💎</td></tr>
+            <tr><td>1240 Diamond</td><td><code>FF_1240D</code></td><td>1240 💎</td></tr>
+            <tr><td>2530 Diamond</td><td><code>FF_2530D</code></td><td>2530 💎</td></tr>
+            <tr><td>Weekly Membership</td><td><code>FF_WEEKLY</code></td><td>450 💎</td></tr>
+            <tr><td>Monthly Membership</td><td><code>FF_MONTHLY</code></td><td>2600 💎</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- 4. PLACE ORDER API -->
+      <section class="card" id="place-order">
+        <h2>4. Place a Top-Up Order</h2>
+        <div class="endpoint"><span class="badge post">POST</span> https://api.arorashop.com/api/reseller/v1/order</div>
+        <p>Call this immediately after your customer completes payment on your website. <code>order_id</code> is idempotent — sending the same <code>order_id</code> twice will never double-deliver or double-charge.</p>
+
+        <h3>Request Body (JSON)</h3>
+        <div class="code-wrap">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre><code>{
+  "order_id": "ORD-10045",
+  "player_uid": "1234567890",
+  "package_code": "FF_25D",
+  "quantity": 1
+}</code></pre>
+        </div>
+
+        <h3>Success Response (HTTP 200)</h3>
+        <div class="code-wrap">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre><code>{
+  "ok": true,
+  "order_id": "ORD-10045",
+  "order_utr": "RES1-ORD-10045",
+  "player_uid": "1234567890",
+  "package_code": "FF_25D",
+  "package_name": "25 Diamond",
+  "quantity": 1,
+  "order_price_bdt": 30,
+  "status": "QUEUED_EXT",
+  "message": "Order queued for Browser Extension."
+}</code></pre>
+        </div>
+
+        <h3>Code Examples (Choose Your Language)</h3>
+        <div class="tabs">
+          <button class="tab-btn active" onclick="showLang('ord', 'php', this)">PHP / Laravel</button>
+          <button class="tab-btn" onclick="showLang('ord', 'plainphp', this)">Plain PHP (cURL)</button>
+          <button class="tab-btn" onclick="showLang('ord', 'node', this)">Node.js (Axios)</button>
+          <button class="tab-btn" onclick="showLang('ord', 'python', this)">Python</button>
+          <button class="tab-btn" onclick="showLang('ord', 'curl', this)">cURL</button>
+        </div>
+
+        <div id="ord-php" class="code-wrap">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre><code>use Illuminate\Support\Facades\Http;
+
+$response = Http::timeout(15)->withHeaders([
+    'X-API-Key'    => env('ARORA_API_KEY'),
+    'X-API-Secret' => env('ARORA_API_SECRET'),
+])->post('https://api.arorashop.com/api/reseller/v1/order', [
+    'order_id'     => (string) $order->id,
+    'player_uid'   => (string) $order->player_uid,
+    'package_code' => 'FF_25D',
+    'quantity'     => 1,
+]);
+
+if ($response->successful() && $response->json('ok')) {
+    // Order is queued! Your webhook will receive COMPLETED automatically.
+} else {
+    // Handle error (e.g. 402 INSUFFICIENT_BALANCE)
+    $error = $response->json('error');
+}</code></pre>
+        </div>
+
+        <div id="ord-plainphp" class="code-wrap hidden">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre><code>&lt;?php
+$payload = json_encode([
+    'order_id'     => 'ORD-10045',
+    'player_uid'   => '1234567890',
+    'package_code' => 'FF_25D',
+    'quantity'     => 1,
+]);
+
+$ch = curl_init('https://api.arorashop.com/api/reseller/v1/order');
+curl_setopt_array($ch, [
+    CURLOPT_POST           => true,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_TIMEOUT        => 15,
+    CURLOPT_HTTPHEADER     => [
+        'Content-Type: application/json',
+        'X-API-Key: arora_live_YOUR_KEY',
+        'X-API-Secret: arora_sec_YOUR_SECRET',
+    ],
+    CURLOPT_POSTFIELDS     => $payload,
+]);
+$result = json_decode(curl_exec($ch), true);
+curl_close($ch);
+print_r($result);</code></pre>
+        </div>
+
+        <div id="ord-node" class="code-wrap hidden">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre><code>const axios = require('axios');
+
+const { data } = await axios.post('https://api.arorashop.com/api/reseller/v1/order', {
+  order_id: 'ORD-10045',
+  player_uid: '1234567890',
+  package_code: 'FF_25D',
+  quantity: 1,
+}, {
+  headers: {
+    'X-API-Key': process.env.ARORA_API_KEY,
+    'X-API-Secret': process.env.ARORA_API_SECRET,
+  },
+  timeout: 15000,
+});
+console.log(data);</code></pre>
+        </div>
+
+        <div id="ord-python" class="code-wrap hidden">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre><code>import requests
+
+res = requests.post(
+    'https://api.arorashop.com/api/reseller/v1/order',
+    json={
+        'order_id': 'ORD-10045',
+        'player_uid': '1234567890',
+        'package_code': 'FF_25D',
+        'quantity': 1,
+    },
+    headers={
+        'X-API-Key': 'arora_live_YOUR_KEY',
+        'X-API-Secret': 'arora_sec_YOUR_SECRET',
+    },
+    timeout=15,
+)
+print(res.status_code, res.json())</code></pre>
+        </div>
+
+        <div id="ord-curl" class="code-wrap hidden">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre><code>curl -X POST https://api.arorashop.com/api/reseller/v1/order \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: arora_live_YOUR_KEY" \
+  -H "X-API-Secret: arora_sec_YOUR_SECRET" \
+  -d '{"order_id":"ORD-10045","player_uid":"1234567890","package_code":"FF_25D","quantity":1}'</code></pre>
+        </div>
+      </section>
+
+      <!-- 5. STATUS & BALANCE -->
+      <section class="card" id="status-balance">
+        <h2>5. Check Order Status, Wallet Balance &amp; Prices</h2>
+        <div class="endpoint"><span class="badge get">GET</span> https://api.arorashop.com/api/reseller/v1/order/{order_id}</div>
+        <div class="endpoint"><span class="badge get">GET</span> https://api.arorashop.com/api/reseller/v1/balance</div>
+        <div class="endpoint"><span class="badge get">GET</span> https://api.arorashop.com/api/reseller/v1/packages</div>
+        <p>Example response from <code>GET /api/reseller/v1/balance</code>:</p>
+        <div class="code-wrap">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre><code>{
+  "ok": true,
+  "shop_name": "Your Store",
+  "wallet_balance_bdt": 220,
+  "reserved_bdt": 0,
+  "available_bdt": 220,
+  "engine_online": true
+}</code></pre>
+        </div>
+      </section>
+
+      <!-- 6. WEBHOOK SETUP GUIDE -->
+      <section class="card" id="webhook-guide">
+        <h2>6. How to Build &amp; Connect Your Webhook (Auto-Complete Orders)</h2>
+        <p>A <b>Webhook</b> is a public <code>POST</code> URL on your website (for example: <code>https://yourwebsite.com/api/arora-webhook</code>). As soon as AroraShop finishes delivering diamonds to the player's UID, our server sends an HTTP <code>POST</code> request to your Webhook URL so your website marks the order <b>COMPLETED</b> automatically — zero manual work!</p>
+
+        <h3>Step-by-Step Setup:</h3>
+        <ol>
+          <li>Create a <code>POST</code> endpoint on your website using one of the code templates below (disable CSRF protection on that webhook route!).</li>
+          <li>Verify the <code>X-Arora-Signature</code> header using HMAC-SHA256 with your <code>X-API-Secret</code> so nobody can forge fake completion callbacks.</li>
+          <li>When <code>status === "COMPLETED"</code>, find <code>order_id</code> in your database and mark it <b>Completed / Delivered</b>.</li>
+          <li>Return HTTP <code>200 OK</code> with <code>{"ok": true}</code>.</li>
+          <li>Go to <a href="/user/dashboard">Partner Dashboard</a> → <b>API Keys, Webhook &amp; Telegram</b> → paste your Webhook URL → click <b>Save Webhook URL</b> → click <b>Send Test Webhook</b> to confirm <code>HTTP 200 OK</code>!</li>
+        </ol>
+
+        <h3>Webhook Headers Sent by AroraShop</h3>
+        <div class="code-wrap">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre><code>Content-Type: application/json
+X-Arora-Event: order.completed
+X-Arora-Timestamp: 1763720400
+X-Arora-Signature: &lt;hmac_sha256(timestamp + "." + rawJsonBody, your_api_secret)&gt;</code></pre>
+        </div>
+
+        <h3>Webhook JSON Payload</h3>
+        <div class="code-wrap">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre><code>{
+  "event": "order.completed",
+  "order_id": "ORD-10045",
+  "internal_ref": "RES1-ORD-10045",
+  "status": "COMPLETED",
+  "player_uid": "1234567890",
+  "package_code": "FF_25D",
+  "package_name": "25 Diamond",
+  "diamonds": 25,
+  "quantity": 1,
+  "method_used": "loaded_account",
+  "price_deducted_bdt": 30,
+  "remaining_wallet_bdt": 220,
+  "receipt_note": "Delivered via Extension",
+  "completed_at": "2026-11-21T12:00:00.000Z"
+}</code></pre>
+        </div>
+
+        <div class="warn-box">
+          <b>Important Security Rule:</b> Always verify <code>X-Arora-Signature</code> before marking any order as Completed! Compute <code>HMAC-SHA256(X-Arora-Timestamp + "." + rawBody, your_api_secret)</code> and compare using constant-time comparison (<code>hash_equals</code> / <code>crypto.timingSafeEqual</code>).
+        </div>
+      </section>
+
+      <!-- 7. WEBHOOK CODE EXAMPLES -->
+      <section class="card" id="webhook-code">
+        <h2>7. Ready-to-Use Webhook Handler Code</h2>
+        <div class="tabs">
+          <button class="tab-btn active" onclick="showLang('wh', 'laravel', this)">Laravel (PHP)</button>
+          <button class="tab-btn" onclick="showLang('wh', 'plainphp', this)">Plain PHP</button>
+          <button class="tab-btn" onclick="showLang('wh', 'node', this)">Node.js (Express)</button>
+          <button class="tab-btn" onclick="showLang('wh', 'python', this)">Python (Flask)</button>
+        </div>
+
+        <div id="wh-laravel" class="code-wrap">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre><code>// 1) In routes/api.php (no CSRF needed for api routes):
+Route::post('/arora-webhook', [AroraWebhookController::class, 'handle']);
+
+// 2) In app/Http/Controllers/AroraWebhookController.php:
+&lt;?php
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Models\Order;
+
+class AroraWebhookController extends Controller
+{
+    public function handle(Request $request)
+    {
+        $secret    = env('ARORA_API_SECRET');
+        $rawBody   = $request->getContent();
+        $timestamp = $request->header('X-Arora-Timestamp', '');
+        $signature = $request->header('X-Arora-Signature', '');
+
+        // Verify HMAC-SHA256 Signature
+        $expected = hash_hmac('sha256', $timestamp . '.' . $rawBody, $secret);
+        if (!$signature || !hash_equals($expected, $signature)) {
+            return response()->json(['ok' => false, 'error' => 'Invalid signature'], 401);
+        }
+
+        $data = $request->json()->all();
+        if (!empty($data['test'])) {
+            return response()->json(['ok' => true, 'message' => 'Test webhook received!']);
+        }
+
+        $order = Order::where('id', $data['order_id'] ?? null)->first();
+        if ($order && ($data['status'] ?? '') === 'COMPLETED') {
+            $order->update([
+                'status' => 'completed',
+                'delivery_note' => $data['receipt_note'] ?? 'Auto-delivered',
+            ]);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+}</code></pre>
+        </div>
+
+        <div id="wh-plainphp" class="code-wrap hidden">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre><code>&lt;?php
+// Save as: https://yourwebsite.com/arora-webhook.php
+header('Content-Type: application/json');
+
+$secret    = 'arora_sec_YOUR_API_SECRET';
+$rawBody   = file_get_contents('php://input');
+$timestamp = $_SERVER['HTTP_X_ARORA_TIMESTAMP'] ?? '';
+$signature = $_SERVER['HTTP_X_ARORA_SIGNATURE'] ?? '';
+
+$expected = hash_hmac('sha256', $timestamp . '.' . $rawBody, $secret);
+if (!$signature || !hash_equals($expected, $signature)) {
+    http_response_code(401);
+    echo json_encode(['ok' => false, 'error' => 'Invalid signature']);
+    exit;
+}
+
+$data = json_decode($rawBody, true);
+if (!empty($data['test'])) {
+    echo json_encode(['ok' => true, 'message' => 'Test webhook OK']);
+    exit;
+}
+
+if (($data['status'] ?? '') === 'COMPLETED') {
+    $orderId = $data['order_id'];
+    // TODO: Update your database: UPDATE orders SET status='completed' WHERE id = ?
+}
+
+http_response_code(200);
+echo json_encode(['ok' => true]);</code></pre>
+        </div>
+
+        <div id="wh-node" class="code-wrap hidden">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre><code>const crypto = require('crypto');
+
+// Capture rawBody in express.json({ verify: (req, res, buf) => { req.rawBody = buf.toString('utf8'); } })
+app.post('/api/arora-webhook', async (req, res) => {
+  const secret = process.env.ARORA_API_SECRET;
+  const ts = req.headers['x-arora-timestamp'] || '';
+  const sig = req.headers['x-arora-signature'] || '';
+  const expected = crypto.createHmac('sha256', secret).update(`${ts}.${req.rawBody || ''}`).digest('hex');
+
+  if (!sig || sig.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+    return res.status(401).json({ ok: false, error: 'Invalid signature' });
+  }
+
+  const { order_id, status, test } = req.body || {};
+  if (test) return res.json({ ok: true, message: 'Test webhook OK' });
+
+  if (status === 'COMPLETED') {
+    // TODO: Mark order_id as COMPLETED in your database
+  }
+  return res.json({ ok: true });
+});</code></pre>
+        </div>
+
+        <div id="wh-python" class="code-wrap hidden">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre><code>import hmac, hashlib
+from flask import Flask, request, jsonify
+
+@app.route('/api/arora-webhook', methods=['POST'])
+def arora_webhook():
+    secret = 'arora_sec_YOUR_API_SECRET'.encode()
+    raw_body = request.get_data(as_text=True)
+    ts = request.headers.get('X-Arora-Timestamp', '')
+    sig = request.headers.get('X-Arora-Signature', '')
+
+    expected = hmac.new(secret, f"{ts}.{raw_body}".encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, sig):
+        return jsonify({'ok': False, 'error': 'Invalid signature'}), 401
+
+    data = request.get_json(silent=True) or {}
+    if data.get('test'):
+        return jsonify({'ok': True, 'message': 'Test webhook OK'})
+
+    if data.get('status') == 'COMPLETED':
+        order_id = data.get('order_id')
+        # TODO: Mark order_id as completed in your DB
+
+    return jsonify({'ok': True})</code></pre>
+        </div>
+      </section>
+
+      <!-- 8. ERROR CODES -->
+      <section class="card" id="errors">
+        <h2>8. HTTP Status &amp; Error Codes</h2>
+        <table>
+          <thead>
+            <tr><th>HTTP</th><th>Code</th><th>Meaning</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>200</code></td><td><code>ok: true</code></td><td>Order accepted &amp; queued (or already exists — idempotent).</td></tr>
+            <tr><td><code>401</code></td><td><code>INVALID_API_KEY / INVALID_API_SECRET</code></td><td>Wrong API Key or API Secret header.</td></tr>
+            <tr><td><code>402</code></td><td><code>INSUFFICIENT_BALANCE</code></td><td>Not enough available BDT in your wallet — top up at <code>/user/dashboard</code>.</td></tr>
+            <tr><td><code>400</code></td><td><code>PRICE_NOT_CONFIGURED</code></td><td>Admin has not set a BDT price for this package yet.</td></tr>
+            <tr><td><code>400</code></td><td><code>PACKAGE_NOT_FOUND</code></td><td>Invalid <code>package_code</code>.</td></tr>
+            <tr><td><code>422</code></td><td><code>VALIDATION_ERROR</code></td><td>Missing <code>order_id</code>, <code>player_uid</code>, or <code>package_code</code>.</td></tr>
+            <tr><td><code>429</code></td><td><code>RATE_LIMITED</code></td><td>Too many requests (limit: 120 req/min).</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    function showLang(prefix, lang, btn) {
+      btn.parentElement.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll(`[id^="${prefix}-"]`).forEach((el) => {
+        el.classList.toggle('hidden', el.id !== `${prefix}-${lang}`);
+      });
+    }
+
+    function copyCode(btn) {
+      const code = btn.parentElement.querySelector('pre').innerText;
+      navigator.clipboard.writeText(code);
+      const orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = orig; }, 1800);
+    }
+  </script>
+</body>
+</html>

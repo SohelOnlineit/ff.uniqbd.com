@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="/logo.png" />
+  <title>AroraShop API — Reseller Dashboard, Top-Up &amp; Documentation</title>
+  <style>
+    :root {
+      --bg: #070b10;
+      --surface: #0f1620;
+      --surface2: #151f2d;
+      --border: #223044;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #00e699;
+      --accent-dark: #00b87a;
+      --danger: #ef4444;
+      --warn: #f59e0b;
+      --info: #38bdf8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.55;
+    }
+    .hidden { display: none !important; }
+    .topbar {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 40;
+    }
+    .topbar-inner {
+      max-width: 1240px; margin: 0 auto; padding: 14px 20px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-badge {
+      width: 38px; height: 38px; border-radius: 10px;
+      background: linear-gradient(135deg, #00e699, #00b87a);
+      display: flex; align-items: center; justify-content: center; font-weight: 900; color: #051014;
+    }
+    .brand h1 { font-size: 16px; font-weight: 800; }
+    .brand small { color: var(--muted); font-size: 12px; display: block; }
+    .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px;
+      border-radius: 8px; border: 1px solid var(--border); background: var(--surface2);
+      color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; transition: .15s;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .btn-primary { background: var(--accent); color: #04120d; border-color: var(--accent); }
+    .btn-primary:hover { background: var(--accent-dark); }
+    .btn-danger { background: rgba(239,68,68,.15); color: #f87171; border-color: rgba(239,68,68,.4); }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+    .container { max-width: 1240px; margin: 0 auto; padding: 22px 20px 60px; }
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px; margin-bottom: 20px;
+    }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+    }
+    .stat-label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+    .stat-val { font-size: 28px; font-weight: 800; margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .stat-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      padding: 18px; margin-bottom: 20px;
+    }
+    .card-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      flex-wrap: wrap; margin-bottom: 14px;
+    }
+    .card-title { font-size: 16px; font-weight: 800; }
+    .topup-bar {
+      background: linear-gradient(135deg, rgba(0,230,153,.09), rgba(56,189,248,.07));
+      border: 1px solid rgba(0,230,153,.3); border-radius: 14px; padding: 16px 18px;
+      margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; flex-wrap: wrap;
+    }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px;
+      border-radius: 999px; font-size: 12px; font-weight: 700;
+    }
+    .pill-green { background: rgba(16,185,129,.16); color: #34d399; border: 1px solid rgba(16,185,129,.35); }
+    .pill-red { background: rgba(239,68,68,.16); color: #f87171; border: 1px solid rgba(239,68,68,.35); }
+    .pill-amber { background: rgba(245,158,11,.16); color: #fbbf24; border: 1px solid rgba(245,158,11,.35); }
+    .pill-blue { background: rgba(56,189,248,.16); color: #38bdf8; border: 1px solid rgba(56,189,248,.35); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .dot-on { background: #10b981; box-shadow: 0 0 8px #10b981; }
+    .dot-off { background: #ef4444; }
+    .tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--border); margin-bottom: 18px; flex-wrap: wrap; }
+    .tab-btn {
+      padding: 10px 15px; background: none; border: none; color: var(--muted); font-weight: 700;
+      font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent;
+    }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; }
+    th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; font-weight: 600; }
+    .field input {
+      width: 100%; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--bg); color: var(--text); font-size: 13px; outline: none;
+    }
+    .field input:focus { border-color: var(--accent); }
+    .key-row { display: flex; gap: 8px; }
+    .key-row input { flex: 1; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+    pre.code {
+      background: #05080d; border: 1px solid var(--border); border-radius: 10px;
+      padding: 14px; overflow-x: auto; font-size: 12px; line-height: 1.6; color: #e2e8f0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin: 10px 0 18px;
+    }
+    .doc-h3 { font-size: 15px; font-weight: 800; color: var(--accent); margin: 18px 0 8px; }
+    .doc-p { font-size: 13px; color: #cbd5e1; margin-bottom: 8px; }
+    .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .login-card { width: 100%; max-width: 400px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 26px; }
+    .toast {
+      position: fixed; bottom: 20px; right: 20px; background: #0d261e; color: #34d399;
+      border: 1px solid #10b981; padding: 11px 16px; border-radius: 10px; font-size: 13px;
+      font-weight: 600; z-index: 999; display: none;
+    }
+    .banner-ok {
+      background: rgba(16,185,129,.15); border: 1px solid rgba(16,185,129,.4); color: #34d399;
+      padding: 12px 16px; border-radius: 10px; margin-bottom: 16px; font-size: 13px; font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div id="toast" class="toast"></div>
+
+  <!-- RESELLER LOGIN VIEW (/user/login) -->
+  <div id="loginView" class="login-wrap">
+    <div class="login-card">
+      <div class="brand" style="margin-bottom:18px;">
+        <img src="/logo.png" alt="AroraShop" style="height:34px;width:auto;display:block;object-fit:contain;" />
+        <div>
+          <h1>AroraShop API Partner</h1>
+          <small>Reseller Portal Login</small>
+        </div>
+      </div>
+      <form id="loginForm">
+        <div class="field"><label>Username</label><input type="text" id="loginUser" required autocomplete="username" placeholder="Your partner username" /></div>
+        <div class="field"><label>Password</label><input type="password" id="loginPass" required autocomplete="current-password" placeholder="••••••••" /></div>
+        <div id="loginErr" style="color:#f87171;font-size:12px;margin-bottom:10px;"></div>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:10px;">Sign In to Dashboard</button>
+      </form>
+      <p style="margin-top:14px;font-size:11.5px;color:var(--muted);text-align:center;">
+        Private Partner Portal. Accounts are created by AroraShop Administration only.<br>
+        <a href="/docs" style="color:var(--accent);font-weight:700;display:inline-block;margin-top:6px;">📖 View Public API &amp; Webhook Documentation →</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- RESELLER DASHBOARD VIEW (/user/dashboard) -->
+  <div id="appView" class="hidden">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <img src="/logo.png" alt="AroraShop" style="height:34px;width:auto;display:block;object-fit:contain;" />
+          <div>
+            <h1 id="shopTitle">Partner Dashboard</h1>
+            <small id="userSub">@partner</small>
+          </div>
+        </div>
+        <div class="actions">
+          <span id="extBadge"></span>
+          <a href="/docs" target="_blank" class="btn btn-sm" style="border-color:rgba(56,189,248,.45);color:#38bdf8;text-decoration:none;">📖 API Docs</a>
+          <button class="btn btn-sm" onclick="loadDashboard()">Refresh</button>
+          <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <div id="topupBanner" class="banner-ok hidden"></div>
+
+      <!-- KPI CARDS -->
+      <section class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Wallet Balance (BDT)</div>
+          <div class="stat-val" id="stWallet" style="color:var(--accent);">0.00 BDT</div>
+          <div class="stat-sub" id="stWalletSub">Available: 0 BDT | Reserved: 0 BDT</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Spent</div>
+          <div class="stat-val" id="stSpent">0 BDT</div>
+          <div class="stat-sub">Completed orders cost</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Completed Orders</div>
+          <div class="stat-val" id="stDone" style="color:#34d399;">0</div>
+          <div class="stat-sub" id="stTotalSub">Total: 0 orders</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pending / Processing</div>
+          <div class="stat-val" id="stProc" style="color:#fbbf24;">0</div>
+          <div class="stat-sub">In delivery queue</div>
+        </div>
+      </section>
+
+      <!-- INSTANT AUTO TOP-UP VIA PAY.ARORASHOP.COM -->
+      <section class="topup-bar">
+        <div>
+          <div style="font-size:15px;font-weight:800;color:var(--text);">⚡ Instant Automated Wallet Top-Up (bKash / Nagad / Rocket / Upay)</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Powered by <b>pay.arorashop.com</b> — Balance is credited automatically right after payment!</div>
+        </div>
+        <form id="topupForm" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="btn btn-sm" onclick="document.getElementById('topupAmt').value=250">250৳</button>
+          <button type="button" class="btn btn-sm" onclick="document.getElementById('topupAmt').value=500">500৳</button>
+          <button type="button" class="btn btn-sm" onclick="document.getElementById('topupAmt').value=1000">1000৳</button>
+          <input type="number" id="topupAmt" min="10" max="500000" step="1" placeholder="Amount (BDT)" required
+                 style="width:135px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-weight:700;" />
+          <button type="submit" id="topupBtn" class="btn btn-primary">Top-Up Now →</button>
+        </form>
+      </section>
+
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('prices', this)">My Diamond Price List</button>
+        <button class="tab-btn" onclick="switchTab('orders', this)">Orders History</button>
+        <button class="tab-btn" onclick="switchTab('wallet', this)">Top-Up &amp; Wallet History</button>
+        <button class="tab-btn" onclick="switchTab('api', this)">API Keys, Webhook &amp; Telegram</button>
+        <button class="tab-btn" onclick="switchTab('docs', this)">API Documentation</button>
+      </div>
+
+      <!-- TAB 1: PRICE LIST -->
+      <div id="tab-prices">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Your Assigned Free Fire Diamond Price List (BDT)</div>
+            <span style="font-size:12px;color:var(--muted);">Use <code>package_code</code> when calling our API</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Package Name</th><th>Package Code</th><th>Diamonds</th><th>Your Price (BDT)</th><th>Availability</th></tr>
+              </thead>
+              <tbody id="pricesBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: ORDERS HISTORY -->
+      <div id="tab-orders" class="hidden">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Your Order History &amp; Wallet Deductions</div></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Your Order ID</th><th>Player UID</th><th>Package</th><th>Price</th><th>Wallet Left</th><th>Status</th><th>Webhook</th><th>Time</th></tr>
+              </thead>
+              <tbody id="ordersBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: TOPUP & WALLET HISTORY -->
+      <div id="tab-wallet" class="hidden">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Automated Top-Up Deposits (pay.arorashop.com)</div></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Reference</th><th>Amount (BDT)</th><th>Method</th><th>TrxID</th><th>Status</th><th>Time</th><th>Action</th></tr>
+              </thead>
+              <tbody id="topupsBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div class="card-title">Wallet Transaction Ledger</div></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Type</th><th>Amount</th><th>Balance After</th><th>Reference</th><th>Note</th><th>Time</th></tr>
+              </thead>
+              <tbody id="ledgerBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: API KEYS, WEBHOOK & TELEGRAM -->
+      <div id="tab-api" class="hidden">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Your API Credentials</div></div>
+          <div class="field">
+            <label>API Base URL</label>
+            <div class="key-row">
+              <input type="text" id="apiBaseUrl" class="mono" value="https://api.arorashop.com" readonly />
+              <button class="btn btn-sm" onclick="copyField('apiBaseUrl')">Copy</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>X-API-Key</label>
+            <div class="key-row">
+              <input type="text" id="myApiKey" class="mono" readonly />
+              <button class="btn btn-sm" onclick="copyField('myApiKey')">Copy</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>X-API-Secret (Keep Private — Used for API Calls &amp; Webhook Signature)</label>
+            <div class="key-row">
+              <input type="text" id="myApiSecret" class="mono" readonly />
+              <button class="btn btn-sm" onclick="copyField('myApiSecret')">Copy</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div class="card-title">Auto-Complete Webhook Callback URL</div></div>
+          <p class="doc-p">When your order is delivered, AroraShop API sends a signed <code>POST</code> request to your Webhook URL so your website automatically marks the order as <b>COMPLETED</b>.</p>
+          <form id="webhookForm">
+            <div class="field"><label>Your Website Webhook URL</label><input type="url" id="myWebhookUrl" placeholder="https://yourwebsite.com/api/arora-webhook" /></div>
+            <div class="actions">
+              <button type="submit" class="btn btn-primary btn-sm">Save Webhook URL</button>
+              <button type="button" class="btn btn-sm" onclick="testWebhook()">Send Test Webhook</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Telegram Bot Notifications (Only Your Orders)</div>
+            <span id="tgStatusBadge" class="pill pill-amber">Not Connected</span>
+          </div>
+          <p class="doc-p">Connect your own Telegram Bot (from <code>@BotFather</code>) to receive instant notifications for your orders.</p>
+          <form id="telegramForm">
+            <div class="field"><label>Telegram Bot Token (AES-256 Encrypted)</label><input type="password" id="myTgToken" class="mono" placeholder="Leave blank to keep saved token" autocomplete="off" /></div>
+            <div class="field"><label>Telegram Chat ID</label><input type="text" id="myTgChatId" class="mono" placeholder="e.g. 123456789 or -1001234567890" /></div>
+            <div class="actions">
+              <button type="submit" class="btn btn-primary btn-sm">Save Telegram Bot</button>
+              <button type="button" class="btn btn-sm" onclick="testTelegram()">Send Test Alert</button>
+              <button type="button" class="btn btn-danger btn-sm" onclick="disconnectTelegram()">Disconnect</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- TAB 5: API DOCUMENTATION -->
+      <div id="tab-docs" class="hidden">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">AroraShop Free Fire Auto-Delivery API — Developer Documentation</div>
+            <span class="pill pill-blue">REST JSON API v1</span>
+          </div>
+
+          <div class="doc-h3">1. Authentication Headers</div>
+          <p class="doc-p">Include these headers in every request from your backend server:</p>
+          <pre class="code" id="docHeaders"></pre>
+
+          <div class="doc-h3">2. Place a Top-Up Order — <code>POST /api/reseller/v1/order</code></div>
+          <p class="doc-p">Call this after your customer pays. If your wallet balance is sufficient for the package's BDT price, the order is immediately queued for automated delivery. Otherwise HTTP <code>402 INSUFFICIENT_BALANCE</code> is returned.</p>
+          <pre class="code" id="docOrderCurl"></pre>
+
+          <div class="doc-h3">3. PHP / Laravel Example</div>
+          <pre class="code" id="docOrderPhp"></pre>
+
+          <div class="doc-h3">4. Node.js (Axios) Example</div>
+          <pre class="code" id="docOrderNode"></pre>
+
+          <div class="doc-h3">5. Check Order Status, Wallet Balance &amp; Price List</div>
+          <pre class="code">GET https://api.arorashop.com/api/reseller/v1/order/{order_id}
+GET https://api.arorashop.com/api/reseller/v1/balance
+GET https://api.arorashop.com/api/reseller/v1/packages</pre>
+
+          <div class="doc-h3">6. Auto-Complete Webhook Payload &amp; HMAC-SHA256 Verification</div>
+          <pre class="code">{
+  "event": "order.completed",
+  "order_id": "ORD-10045",
+  "status": "COMPLETED",
+  "player_uid": "1234567890",
+  "package_code": "FF_25D",
+  "package_name": "25 Diamond",
+  "diamonds": 25,
+  "quantity": 1,
+  "price_deducted_bdt": 30,
+  "remaining_wallet_bdt": 220,
+  "receipt_note": "Delivered via Extension",
+  "completed_at": "2026-11-21T12:00:00.000Z"
+}</pre>
+          <pre class="code">&lt;?php
+$secret    = 'YOUR_API_SECRET';
+$rawBody   = file_get_contents('php://input');
+$timestamp = $_SERVER['HTTP_X_ARORA_TIMESTAMP'] ?? '';
+$signature = $_SERVER['HTTP_X_ARORA_SIGNATURE'] ?? '';
+
+$expected = hash_hmac('sha256', $timestamp . '.' . $rawBody, $secret);
+if (!hash_equals($expected, $signature)) {
+    http_response_code(401);
+    exit('Invalid signature');
+}
+
+$data = json_decode($rawBody, true);
+if (($data['status'] ?? '') === 'COMPLETED') {
+    $orderId = $data['order_id'];
+    // Mark $orderId as COMPLETED in your database!
+}
+http_response_code(200);
+echo json_encode(['ok' => true]);</pre>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function toast(msg, isErr = false) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.style.background = isErr ? '#2b0f14' : '#0d261e';
+      el.style.color = isErr ? '#f87171' : '#34d399';
+      el.style.borderColor = isErr ? '#ef4444' : '#10b981';
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 3500);
+    }
+
+    async function api(url, opts = {}) {
+      const res = await fetch(url, {
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        ...opts,
+      });
+      return res.json();
+    }
+
+    function fmtAgo(ts) {
+      if (!ts) return 'Never';
+      const sec = Math.max(0, Math.floor((Date.now() - Number(ts)) / 1000));
+      if (sec < 60) return sec + 's ago';
+      if (sec < 3600) return Math.floor(sec / 60) + 'm ago';
+      return Math.floor(sec / 3600) + 'h ago';
+    }
+
+    function switchTab(name, btn) {
+      document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      ['prices', 'orders', 'wallet', 'api', 'docs'].forEach((t) => {
+        document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
+      });
+    }
+
+    function copyField(id) {
+      navigator.clipboard.writeText(document.getElementById(id).value);
+      toast('Copied!');
+    }
+
+    function checkTopupQuery() {
+      const q = new URLSearchParams(location.search);
+      const st = q.get('topup');
+      const amt = q.get('amount');
+      const banner = document.getElementById('topupBanner');
+      if (st === 'success') {
+        banner.textContent = `✅ Wallet Top-Up Successful! +${amt || ''} BDT has been credited to your wallet.`;
+        banner.classList.remove('hidden');
+        history.replaceState(null, '', '/user/dashboard');
+      } else if (st === 'cancelled') {
+        toast('Top-up payment was cancelled.', true);
+        history.replaceState(null, '', '/user/dashboard');
+      }
+    }
+
+    function renderDocs(apiKey) {
+      document.getElementById('docHeaders').textContent =
+`Content-Type: application/json
+X-API-Key: ${apiKey}
+X-API-Secret: YOUR_API_SECRET`;
+
+      document.getElementById('docOrderCurl').textContent =
+`curl -X POST https://api.arorashop.com/api/reseller/v1/order \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: ${apiKey}" \\
+  -H "X-API-Secret: YOUR_API_SECRET" \\
+  -d '{
+    "order_id": "ORD-10045",
+    "player_uid": "1234567890",
+    "package_code": "FF_25D",
+    "quantity": 1
+  }'`;
+
+      document.getElementById('docOrderPhp').textContent =
+`$response = Http::withHeaders([
+    'X-API-Key'    => '${apiKey}',
+    'X-API-Secret' => env('ARORA_API_SECRET'),
+])->post('https://api.arorashop.com/api/reseller/v1/order', [
+    'order_id'     => $order->id,
+    'player_uid'   => $order->player_uid,
+    'package_code' => 'FF_25D',
+    'quantity'     => 1,
+]);`;
+
+      document.getElementById('docOrderNode').textContent =
+`const res = await axios.post('https://api.arorashop.com/api/reseller/v1/order', {
+  order_id: 'ORD-10045',
+  player_uid: '1234567890',
+  package_code: 'FF_25D',
+  quantity: 1
+}, {
+  headers: {
+    'X-API-Key': '${apiKey}',
+    'X-API-Secret': process.env.ARORA_API_SECRET
+  }
+});`;
+    }
+
+    let dashSig = '';
+    let dashBusy = false;
+    async function loadDashboard() {
+      if (dashBusy) return;
+      dashBusy = true;
+      try {
+      const d = await api('/user-api/dashboard');
+      if (!d.ok) {
+        document.getElementById('appView').classList.add('hidden');
+        document.getElementById('loginView').classList.remove('hidden');
+        if (location.pathname !== '/user/login') history.replaceState(null, '', '/user/login');
+        return;
+      }
+
+      document.getElementById('loginView').classList.add('hidden');
+      document.getElementById('appView').classList.remove('hidden');
+      const sig = JSON.stringify(d);
+      if (sig === dashSig) return;
+      dashSig = sig;
+      checkTopupQuery();
+      if (location.pathname !== '/user/dashboard') history.replaceState(null, '', '/user/dashboard');
+
+      const p = d.profile;
+      document.getElementById('shopTitle').textContent = p.shop_name;
+      document.getElementById('userSub').textContent = `@${p.username} • AroraShop API Partner`;
+      document.getElementById('extBadge').innerHTML = p.extension_online
+        ? `<span class="pill pill-green"><span class="dot dot-on"></span> Auto-Delivery Online (${fmtAgo(p.ext_last_seen_at)})</span>`
+        : `<span class="pill pill-red"><span class="dot dot-off"></span> Auto-Delivery Offline (${fmtAgo(p.ext_last_seen_at)})</span>`;
+
+      document.getElementById('stWallet').textContent = `${d.stats.wallet_balance} BDT`;
+      document.getElementById('stWalletSub').textContent = `Available: ${d.stats.available_bdt} BDT | Reserved: ${d.stats.reserved_bdt} BDT`;
+      document.getElementById('stSpent').textContent = `${d.stats.total_spent_bdt} BDT`;
+      document.getElementById('stDone').textContent = d.stats.completed_orders;
+      document.getElementById('stTotalSub').textContent = `Total: ${d.stats.total_orders} orders`;
+      document.getElementById('stProc').textContent = d.stats.processing_orders;
+
+      document.getElementById('myApiKey').value = p.api_key;
+      document.getElementById('myApiSecret').value = p.api_secret;
+      if (document.activeElement !== document.getElementById('myWebhookUrl')) {
+        document.getElementById('myWebhookUrl').value = p.webhook_url || '';
+      }
+      if (document.activeElement !== document.getElementById('myTgChatId')) {
+        document.getElementById('myTgChatId').value = p.telegram_chat_id || '';
+      }
+      const tgBadge = document.getElementById('tgStatusBadge');
+      if (p.telegram_connected) {
+        tgBadge.className = 'pill pill-green';
+        tgBadge.innerHTML = '<span class="dot dot-on"></span> Connected';
+      } else {
+        tgBadge.className = 'pill pill-amber';
+        tgBadge.textContent = 'Not Connected';
+      }
+      renderDocs(p.api_key);
+
+      document.getElementById('pricesBody').innerHTML = d.prices.map((pkg) => {
+        const isActive = Number(pkg.is_active) === 1;
+        const statusHtml = !isActive
+          ? '<span class="pill pill-red">Inactive</span>'
+          : pkg.price_bdt > 0
+          ? '<span class="pill pill-green">Active</span>'
+          : '<span class="pill pill-amber">Contact Admin</span>';
+        return `
+        <tr style="${isActive ? '' : 'opacity:0.6;'}">
+          <td><b>${pkg.name}</b></td>
+          <td class="mono">${pkg.package_code}</td>
+          <td>${pkg.diamonds} 💎</td>
+          <td><b style="color:var(--accent);font-size:15px;">${pkg.price_bdt > 0 ? pkg.price_bdt + ' BDT' : 'Not Set'}</b></td>
+          <td>${statusHtml}</td>
+        </tr>
+      `;
+      }).join('');
+
+      document.getElementById('ordersBody').innerHTML = d.orders.length ? d.orders.map((o) => `
+        <tr>
+          <td class="mono"><b>${o.order_id || o.internal_ref}</b></td>
+          <td class="mono">${o.player_uid}</td>
+          <td>${o.package_name} ×${o.quantity}</td>
+          <td style="color:#f87171;font-weight:700;">-${o.order_price_bdt} BDT</td>
+          <td style="color:var(--accent);font-weight:700;">${o.balance_after !== null && o.balance_after !== undefined ? `${o.balance_after} BDT` : '-'}</td>
+          <td><span class="pill ${o.status === 'COMPLETED' ? 'pill-green' : o.status === 'CANCELLED' ? 'pill-red' : 'pill-amber'}">${o.status}</span></td>
+          <td class="mono">${o.webhook_status || '-'}</td>
+          <td style="font-size:11px;color:var(--muted);">${o.created_at}</td>
+        </tr>
+      `).join('') : '<tr><td colspan="8" style="color:var(--muted);">No orders yet.</td></tr>';
+
+      document.getElementById('topupsBody').innerHTML = d.topups.length ? d.topups.map((t) => `
+        <tr>
+          <td class="mono">${t.topup_ref}</td>
+          <td><b style="color:var(--accent);">+${t.amount_bdt} BDT</b></td>
+          <td>${t.payment_method || '-'}</td>
+          <td class="mono">${t.trx_id || '-'}</td>
+          <td><span class="pill ${t.status === 'COMPLETED' ? 'pill-green' : 'pill-amber'}">${t.status}</span></td>
+          <td style="font-size:11px;color:var(--muted);">${t.created_at}</td>
+          <td>${t.status !== 'COMPLETED' ? `<button class="btn btn-sm" onclick="verifyTopup('${t.topup_ref}')">Verify</button>` : '✓'}</td>
+        </tr>
+      `).join('') : '<tr><td colspan="7" style="color:var(--muted);">No top-ups yet.</td></tr>';
+
+      document.getElementById('ledgerBody').innerHTML = d.ledger.length ? d.ledger.map((l) => `
+        <tr>
+          <td><span class="pill ${l.amount_bdt >= 0 ? 'pill-green' : 'pill-red'}">${l.type}</span></td>
+          <td style="font-weight:700;color:${l.amount_bdt >= 0 ? '#34d399' : '#f87171'};">${l.amount_bdt >= 0 ? '+' : ''}${l.amount_bdt} BDT</td>
+          <td><b>${l.balance_after} BDT</b></td>
+          <td class="mono">${l.reference || '-'}</td>
+          <td style="font-size:12px;color:var(--muted);">${l.note || '-'}</td>
+          <td style="font-size:11px;color:var(--muted);">${l.created_at}</td>
+        </tr>
+      `).join('') : '<tr><td colspan="6" style="color:var(--muted);">No ledger entries yet.</td></tr>';
+      } finally {
+        dashBusy = false;
+      }
+    }
+
+    document.getElementById('topupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('topupBtn');
+      const amt = Number(document.getElementById('topupAmt').value);
+      btn.disabled = true;
+      btn.textContent = 'Redirecting...';
+      const r = await api('/user-api/topup/initiate', {
+        method: 'POST',
+        body: JSON.stringify({ amount_bdt: amt }),
+      });
+      if (r.ok && r.payment_url) {
+        location.href = r.payment_url;
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Top-Up Now →';
+        toast(r.error || 'Could not initiate payment', true);
+      }
+    });
+
+    async function verifyTopup(ref) {
+      const r = await api(`/user-api/topup/${encodeURIComponent(ref)}/verify`, { method: 'POST' });
+      if (r.ok) { toast(`Verified! +${r.amount_bdt} BDT credited!`); loadDashboard(); }
+      else toast(r.error || 'Not paid yet', true);
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      document.getElementById('loginErr').textContent = '';
+      const r = await api('/user-api/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          username: document.getElementById('loginUser').value.trim(),
+          password: document.getElementById('loginPass').value,
+        }),
+      });
+      if (r.ok) loadDashboard();
+      else document.getElementById('loginErr').textContent = r.error || 'Login failed';
+    });
+
+    document.getElementById('webhookForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const r = await api('/user-api/webhook', {
+        method: 'PUT',
+        body: JSON.stringify({ webhook_url: document.getElementById('myWebhookUrl').value.trim() }),
+      });
+      if (r.ok) toast('Webhook URL saved!');
+      else toast(r.error || 'Failed', true);
+    });
+
+    async function testWebhook() {
+      const r = await api('/user-api/test-webhook', { method: 'POST' });
+      if (r.ok) toast(r.message);
+      else toast(r.error || r.message || 'Test webhook failed', true);
+    }
+
+    document.getElementById('telegramForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const r = await api('/user-api/telegram', {
+        method: 'PUT',
+        body: JSON.stringify({
+          bot_token: document.getElementById('myTgToken').value.trim(),
+          chat_id: document.getElementById('myTgChatId').value.trim(),
+        }),
+      });
+      if (r.ok) { document.getElementById('myTgToken').value = ''; toast(r.message); loadDashboard(); }
+      else toast(r.error || 'Failed', true);
+    });
+
+    async function testTelegram() {
+      const r = await api('/user-api/test-telegram', { method: 'POST' });
+      if (r.ok) toast(r.message);
+      else toast(r.error || 'Telegram test failed', true);
+    }
+
+    async function disconnectTelegram() {
+      if (!confirm('Disconnect your Telegram bot?')) return;
+      const r = await api('/user-api/telegram', { method: 'PUT', body: JSON.stringify({ disconnect: true }) });
+      if (r.ok) { document.getElementById('myTgToken').value = ''; document.getElementById('myTgChatId').value = ''; toast('Disconnected.'); loadDashboard(); }
+    }
+
+    async function logout() {
+      await api('/user-api/logout', { method: 'POST' });
+      location.href = '/user/login';
+    }
+
+    loadDashboard();
+    setInterval(() => {
+      if (document.hidden) return;
+      if (!document.getElementById('appView').classList.contains('hidden')) loadDashboard();
+    }, 10000);
+  </script>
+</body>
+</html>
