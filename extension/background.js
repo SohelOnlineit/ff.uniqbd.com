@@ -11,7 +11,7 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.get(['apiBase'], (res) => {
     chrome.storage.local.set({ apiBase: normalizeBase(res.apiBase) });
   });
-  chrome.alarms.create('aroraPollOrders', { periodInMinutes: 0.1 }); // every 6 seconds
+  chrome.alarms.create('aroraPollOrders', { periodInMinutes: 1 });
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
