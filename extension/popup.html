@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AroraShop FF Helper</title>
+  <style>
+    body {
+      width: 320px;
+      margin: 0;
+      padding: 14px;
+      background: #0b0f14;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 13px;
+    }
+    .head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .title { font-size: 14px; font-weight: 700; color: #15b48b; }
+    .sub { font-size: 11px; color: #94a3b8; }
+    .field { margin-bottom: 10px; }
+    .field label { display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px; font-weight: 600; }
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      box-sizing: border-box;
+      background: #121821;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #f1f5f9;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      outline: none;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #121821;
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 8px 10px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+    .btn {
+      width: 100%;
+      background: #15b48b;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 8px;
+    }
+    .btn-sec {
+      background: #19222f;
+      color: #cbd5e1;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .box {
+      background: #121821;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 9px 10px;
+      font-size: 12px;
+      color: #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+  <div class="head">
+    <div>
+      <div class="title">AroraShop FF Helper</div>
+      <div class="sub">Garena &amp; UniPin Operator Extension</div>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>API URL</label>
+    <input type="text" id="apiBase" value="https://ff.uniqbd.com" />
+  </div>
+
+  <div class="field">
+    <label>Extension Secret Key</label>
+    <input type="password" id="extKey" placeholder="Paste key from API dashboard" />
+  </div>
+
+  <div class="row">
+    <span>Auto-Listen Queue (Every 6s)</span>
+    <input type="checkbox" id="autoListen" />
+  </div>
+
+  <button id="saveBtn" class="btn">Save Settings</button>
+  <button id="pollBtn" class="btn btn-sec">Check Next Order Now</button>
+  <button id="clearBtn" class="btn btn-sec">Clear Active Task</button>
+
+  <div class="box">
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:3px;">Status:</div>
+    <div id="statusBox" style="font-weight:600;color:#34d399;">Idle</div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

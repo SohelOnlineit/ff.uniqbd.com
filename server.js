@@ -223,6 +223,31 @@ function num(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function clientIp(req) {
+  const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  return (fwd || req.socket.remoteAddress || '').slice(0, 80);
+}
+
+function extensionMatches(req) {
+  const given = String(req.headers['x-extension-key'] || '').trim();
+  if (!given || given.length > 200) return false;
+  const row = pgOne('SELECT extension_key FROM resellers ORDER BY id LIMIT 1');
+  const saved = row && row.extension_key ? String(row.extension_key) : '';
+  const left = Buffer.from(given);
+  const right = Buffer.from(saved);
+  if (!saved || left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+}
+
+function touchExtension(ip) {
+  const now = Date.now();
+  const saved = pg(`UPDATE extension_status SET last_seen_at = ${now}, last_ip = ${sqlString(ip)} RETURNING key_id`);
+  if (!saved) {
+    pg(`INSERT INTO extension_status (key_id, last_seen_at, last_ip) VALUES ('root', ${now}, ${sqlString(ip)})`);
+  }
+  pg(`UPDATE resellers SET ext_last_seen_at = ${now}, ext_last_ip = ${sqlString(ip)}`);
+}
+
 function seenOnline(ts) {
   const n = Number(ts || 0);
   if (!n) return false;
@@ -386,6 +411,40 @@ const server = http.createServer(async (req, res) => {
     } catch (err) {
       console.error('account action failed:', dbError(err));
       return sendJson(res, 500, { ok: false });
+    }
+  }
+
+  if (pathname === '/ext-api/next-order' && req.method === 'GET') {
+    try {
+      if (!extensionMatches(req)) return sendJson(res, 401, { ok: false, error: 'Invalid extension key' });
+      touchExtension(clientIp(req));
+      return sendJson(res, 200, { ok: true, task: null });
+    } catch (err) {
+      console.error('extension poll failed:', dbError(err));
+      return sendJson(res, 500, { ok: false, error: 'Extension API failed' });
+    }
+  }
+
+  if (pathname === '/ext-api/order-result' && req.method === 'POST') {
+    try {
+      if (!extensionMatches(req)) return sendJson(res, 401, { ok: false, error: 'Invalid extension key' });
+      touchExtension(clientIp(req));
+      const body = JSON.parse(await readBody(req) || '{}');
+      const utr = String(body.order_utr || '').trim().slice(0, 80);
+      const allowed = ['COMPLETED', 'PROCESSING', 'PAUSED', 'CANCELLED', 'QUEUED_EXT', 'IN_PROGRESS_EXT'];
+      const status = allowed.includes(body.status) ? body.status : 'PROCESSING';
+      const reason = String(body.error_message || body.receipt_note || '').slice(0, 500);
+      const receipt = String(body.receipt_note || '').slice(0, 500);
+      if (utr) {
+        const completed = status === 'COMPLETED' ? ', completed_at = CURRENT_TIMESTAMP' : '';
+        pg(`UPDATE fulfillment_orders
+            SET status = ${sqlString(status)}, status_reason = ${sqlString(reason)}, receipt_note = ${sqlString(receipt)}${completed}
+            WHERE arora_order_utr = ${sqlString(utr)}`);
+      }
+      return sendJson(res, 200, { ok: true });
+    } catch (err) {
+      console.error('extension result failed:', dbError(err));
+      return sendJson(res, 500, { ok: false, error: 'Extension API failed' });
     }
   }
 
