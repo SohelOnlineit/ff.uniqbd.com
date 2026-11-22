@@ -76,6 +76,11 @@ function sqlString(value) {
   return "'" + String(value).replace(/'/g, "''") + "'";
 }
 
+function dbError(err) {
+  const detail = err && err.stderr ? String(err.stderr).trim() : '';
+  return detail.split('\n').find((line) => line.trim()) || 'database command failed';
+}
+
 function pg(sql) {
   const out = execFileSync(psqlBin, [
     '-h', process.env.PGHOST || '127.0.0.1',
@@ -244,7 +249,7 @@ if (process.argv[2] === '--hash') {
 try {
   applyAdminReset();
 } catch (err) {
-  console.error('admin password reset failed:', err && err.message ? err.message : err);
+  console.error('admin password reset failed:', dbError(err));
 }
 
 const server = http.createServer(async (req, res) => {
@@ -266,7 +271,7 @@ const server = http.createServer(async (req, res) => {
       if (!row || !verifyPassword(password, row.password_hash)) return sendJson(res, 401, { ok: false });
       return sendJson(res, 200, { ok: true, token: signToken(row.username) });
     } catch (err) {
-      console.error('login failed:', err && err.message ? err.message : err);
+      console.error('login failed:', dbError(err));
       return sendJson(res, 401, { ok: false });
     }
   }
@@ -286,7 +291,7 @@ const server = http.createServer(async (req, res) => {
     try {
       return sendJson(res, 200, dashboard());
     } catch (err) {
-      console.error('dashboard failed:', err && err.message ? err.message : err);
+      console.error('dashboard failed:', dbError(err));
       return sendJson(res, 500, { ok: false });
     }
   }
