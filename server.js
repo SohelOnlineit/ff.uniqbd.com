@@ -827,45 +827,48 @@ function orderActionResult(id, action, body) {
   return { status: 200, body: { ok: true } };
 }
 
+function cancelUndeliveredOrder(order, reason, receipt) {
+  const why = String(reason || 'The extension could not deliver the diamonds. This order is cancelled.').slice(0, 500);
+  const note = String(receipt || '').slice(0, 500);
+  pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
+    WHERE used_order_utr = ${sqlString(order.arora_order_utr)}`);
+  pg(`UPDATE fulfillment_orders
+    SET voucher_ids = NULL, method_used = 'none', account_id = NULL, status = 'CANCELLED',
+        status_reason = ${sqlString(why)}, receipt_note = ${sqlString(note)}
+    WHERE arora_order_utr = ${sqlString(order.arora_order_utr)} AND status <> 'COMPLETED'`);
+  if (order.status !== 'CANCELLED') notifyOrderStatus(order, 'CANCELLED', why);
+}
+
+function cancelStuckProcessingOrders() {
+  let rows = [];
+  try {
+    rows = pgJson(`SELECT status, arora_order_utr, shop_order_number, player_uid, package_name, status_reason, receipt_note
+      FROM fulfillment_orders WHERE status = 'PROCESSING'`);
+  } catch (err) {
+    console.error('cancel stuck orders:', dbError(err));
+    return;
+  }
+  rows.forEach((row) => cancelUndeliveredOrder(row, row.status_reason, row.receipt_note));
+}
+
 function finishExtensionOrder(body) {
   const utr = String(body.order_utr || '').trim().slice(0, 80);
   const allowed = ['COMPLETED', 'PROCESSING', 'PAUSED', 'CANCELLED', 'QUEUED_EXT', 'IN_PROGRESS_EXT'];
-  const status = allowed.includes(body.status) ? body.status : 'PROCESSING';
+  const status = allowed.includes(body.status) ? body.status : 'CANCELLED';
   const reason = String(body.error_message || body.receipt_note || '').slice(0, 500);
   const receipt = String(body.receipt_note || '').slice(0, 500);
   if (!utr) return;
   const order = pgOne(`SELECT status, arora_order_utr, shop_order_number, player_uid, package_code, package_name, quantity, reseller_order_id, account_id, order_price_bdt, delivery_attempts
     FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(utr)} LIMIT 1`);
-  if (!order) return;
-  const stopTrying = status !== 'COMPLETED' && num(order.delivery_attempts) >= DELIVERY_TRY_LIMIT;
-  if (body.release_voucher && status !== 'COMPLETED') {
-    pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
-      WHERE used_order_utr = ${sqlString(utr)}`);
-    if (stopTrying) {
-      pg(`UPDATE fulfillment_orders
-        SET voucher_ids = NULL, method_used = 'none', account_id = NULL, status = 'CANCELLED', status_reason = ${sqlString(DELIVERY_STOP_REASON)}
-        WHERE arora_order_utr = ${sqlString(utr)}`);
-      if (order.status !== 'CANCELLED') notifyOrderStatus(order, 'CANCELLED', DELIVERY_STOP_REASON);
-      return;
-    }
-    pg(`UPDATE fulfillment_orders SET voucher_ids = NULL, method_used = 'none', status = 'QUEUED_EXT' WHERE arora_order_utr = ${sqlString(utr)}`);
-    if (order.status !== 'QUEUED_EXT') notifyOrderStatus(order, 'QUEUED_EXT', '');
+  if (!order || order.status === 'COMPLETED') return;
+  if (status !== 'COMPLETED') {
+    cancelUndeliveredOrder(order, reason, receipt);
     return;
   }
-  if (stopTrying) {
-    const stopped = reason || DELIVERY_STOP_REASON;
-    pg(`UPDATE fulfillment_orders
-      SET status = 'CANCELLED', status_reason = ${sqlString(stopped)}, receipt_note = ${sqlString(receipt)}
-      WHERE arora_order_utr = ${sqlString(utr)}`);
-    if (order.status !== 'CANCELLED') notifyOrderStatus(order, 'CANCELLED', stopped);
-    return;
-  }
-  const completed = status === 'COMPLETED' ? ', completed_at = CURRENT_TIMESTAMP' : '';
   pg(`UPDATE fulfillment_orders
-    SET status = ${sqlString(status)}, status_reason = ${sqlString(reason)}, receipt_note = ${sqlString(receipt)}${completed}
+    SET status = 'COMPLETED', status_reason = ${sqlString(reason)}, receipt_note = ${sqlString(receipt)}, completed_at = CURRENT_TIMESTAMP
     WHERE arora_order_utr = ${sqlString(utr)}`);
-  if (order.status !== status) notifyOrderStatus(order, status, reason);
-  if (status !== 'COMPLETED') return;
+  if (order.status !== 'COMPLETED') notifyOrderStatus(order, 'COMPLETED', reason);
   if (order.account_id) {
     const pack = pgOne(`SELECT unipin_uc_cost FROM ff_packages WHERE package_code = ${sqlString(order.package_code)} LIMIT 1`) || {};
     pg(`UPDATE unipin_loaded_accounts SET balance = balance - ${num(pack.unipin_uc_cost)} WHERE id = ${Number(order.account_id)}`);
@@ -1420,6 +1423,7 @@ try {
 server.listen(port, host, () => {
   try {
     shortenStoredOrderIds();
+    cancelStuckProcessingOrders();
   } catch (err) {
     console.error('Could not shorten old order ids');
   }
