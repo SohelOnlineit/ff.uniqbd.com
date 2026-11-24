@@ -1409,7 +1409,7 @@ const server = http.createServer(async (req, res) => {
   res.writeHead(200, {
     'Content-Type': types[path.extname(full).toLowerCase()] || 'application/octet-stream',
     'X-Content-Type-Options': 'nosniff',
-    'Cache-Control': path.extname(full).toLowerCase() === '.html' ? 'no-cache' : 'public, max-age=3600',
+    'Cache-Control': ['.html', '.zip'].includes(path.extname(full).toLowerCase()) ? 'no-cache' : 'public, max-age=3600',
   });
   fs.createReadStream(full).pipe(res);
 });
