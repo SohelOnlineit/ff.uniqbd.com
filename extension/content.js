@@ -232,7 +232,7 @@
 
     bar.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <strong style="color:#15b48b;font-size:13px;">AroraShop Helper v1.4.1</strong>
+        <strong style="color:#15b48b;font-size:13px;">AroraShop Helper v1.4.2</strong>
         <span style="background:rgba(21,180,139,0.16);color:#34d399;padding:2px 7px;border-radius:99px;font-size:11px;font-weight:600;">${task.order_utr}</span>
       </div>
       <div style="color:#cbd5e1;margin-bottom:4px;">UID: <b>${task.player_uid}</b> &bull; <b>${task.denom_label}</b></div>
@@ -508,12 +508,24 @@
 
           const uidInput = document.querySelector('input[placeholder*="player ID" i], input[placeholder*="UID" i]');
           if (uidInput && isVisible(uidInput)) {
+            if (Number(task.uidTries || 0) >= 2) {
+              renderFloatingBar(task, 'Could not deliver diamonds after 2 tries.', true);
+              reportOnce(task, {
+                orderUtr: task.order_utr,
+                status: 'PROCESSING',
+                errorMessage: `Could not deliver diamonds to UID ${task.player_uid} after 2 tries`,
+                releaseVoucher: true,
+              });
+              stepBusy = false;
+              return;
+            }
             if (isInActionCooldown('garena_uid_login', 7000)) {
               renderFloatingBar(task, 'Waiting for Garena UID verification...', false);
               stepBusy = false;
               return;
             }
             markAction('garena_uid_login');
+            chrome.storage.local.set({ activeTask: { ...task, uidTries: Number(task.uidTries || 0) + 1 } });
             renderFloatingBar(task, `Entering UID ${task.player_uid} & clicking Login...`, false);
             if (uidInput.value !== String(task.player_uid)) {
               setNativeValue(uidInput, task.player_uid);

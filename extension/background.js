@@ -1,17 +1,9 @@
 const DEFAULT_API_BASE = 'https://ff.uniqbd.com';
+const OLD_API_BASE = 'https://api.arorashop.com';
 const GARENA_SHOP_URL = 'https://shop.garena.my/?channel=202953';
 
-function normalizeBase(value) {
-  const base = String(value || '').trim().replace(/\/+$/, '');
-  if (!base || base === 'https://api.arorashop.com') return DEFAULT_API_BASE;
-  return base;
-}
-
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.get(['apiBase'], (res) => {
-    chrome.storage.local.set({ apiBase: normalizeBase(res.apiBase) });
-  });
-  chrome.alarms.create('aroraPollOrders', { periodInMinutes: 1 });
+  chrome.alarms.create('aroraPollOrders', { periodInMinutes: 0.1 }); // every 6 seconds
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -25,8 +17,11 @@ async function getSettings() {
     chrome.storage.local.get(
       ['apiBase', 'extKey', 'autoListen', 'activeTask', 'activeTabId', 'lastLog'],
       (res) => {
+        const savedBase = String(res.apiBase || '').trim().replace(/\/+$/, '');
+        const apiBase = !savedBase || savedBase === OLD_API_BASE ? DEFAULT_API_BASE : savedBase;
+        if (apiBase !== savedBase) chrome.storage.local.set({ apiBase });
         resolve({
-          apiBase: normalizeBase(res.apiBase),
+          apiBase,
           extKey: (res.extKey || '').trim(),
           autoListen: Boolean(res.autoListen),
           activeTask: res.activeTask || null,
@@ -38,16 +33,43 @@ async function getSettings() {
   });
 }
 
-async function clearGarenaShopCookies() {
+const SHOP_COOKIE_DOMAINS = ['garena.my', 'garena.com', 'unipin.com'];
+const SHOP_ORIGINS = [
+  'https://shop.garena.my',
+  'https://garena.my',
+  'https://www.garena.my',
+  'https://unipin.com',
+  'https://www.unipin.com',
+];
+
+function cookieRemovalUrl(cookie) {
+  const host = String(cookie.domain || '').replace(/^\./, '');
+  const protocol = cookie.secure ? 'https:' : 'http:';
+  return `${protocol}//${host}${cookie.path || '/'}`;
+}
+
+async function clearShopCookies() {
   try {
-    const domains = ['garena.my', 'garena.com'];
-    for (const domain of domains) {
-      const cookies = await chrome.cookies.getAll({ domain });
-      for (const c of cookies) {
-        const cleanDomain = c.domain.replace(/^\./, '');
-        const url = `https://${cleanDomain}${c.path || '/'}`;
-        await chrome.cookies.remove({ url, name: c.name }).catch(() => {});
+    const stores = await chrome.cookies.getAllCookieStores().catch(() => []);
+    const storeIds = stores.length ? stores.map((store) => store.id) : [undefined];
+    for (const storeId of storeIds) {
+      for (const domain of SHOP_COOKIE_DOMAINS) {
+        const cookies = await chrome.cookies.getAll(storeId ? { domain, storeId } : { domain });
+        for (const cookie of cookies) {
+          const details = { url: cookieRemovalUrl(cookie), name: cookie.name };
+          if (cookie.storeId) details.storeId = cookie.storeId;
+          if (cookie.partitionKey) details.partitionKey = cookie.partitionKey;
+          await chrome.cookies.remove(details).catch(() => {});
+        }
       }
+    }
+  } catch (_) {}
+  try {
+    if (chrome.browsingData && chrome.browsingData.remove) {
+      await chrome.browsingData.remove(
+        { origins: SHOP_ORIGINS },
+        { cookies: true, localStorage: true }
+      );
     }
   } catch (_) {}
 }
@@ -58,7 +80,7 @@ async function closeFulfillmentTab(tabId) {
     const tab = await chrome.tabs.get(tabId).catch(() => null);
     if (!tab) return;
     const url = tab.url || '';
-    // Safety: only auto-close Garena Shop or UniPin tabs (never close api.arorashop.com dashboard)
+    // Safety: only auto-close Garena Shop or UniPin tabs (never close the ff.uniqbd.com dashboard)
     if (!url.includes('shop.garena.my') && !url.includes('unipin.com')) {
       return;
     }
@@ -138,7 +160,7 @@ async function pollNextOrder(force = false) {
     });
 
     // Always clear previous Garena Shop session cookies before starting a fresh UID order
-    await clearGarenaShopCookies();
+    await clearShopCookies();
 
     // Open or reuse Garena Shop / UniPin tab
     const tabs = await chrome.tabs.query({
@@ -193,12 +215,12 @@ async function submitOrderResult({ orderUtr, status, receiptNote, errorMessage, 
     });
 
     // Clear Garena Shop cookies immediately so next order always starts with a clean UID login
-    await clearGarenaShopCookies();
+    await clearShopCookies();
 
     // Auto-close the Garena/UniPin tab after a 3.5s pause so operator can see the confirmation clearly
     if (tabToClose) {
       setTimeout(() => {
-        closeFulfillmentTab(tabToClose);
+        clearShopCookies().finally(() => closeFulfillmentTab(tabToClose));
       }, 3500);
     }
 
