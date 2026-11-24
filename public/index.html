@@ -429,6 +429,48 @@
     .key-row { display: flex; gap: 8px; flex-wrap: wrap; }
     .key-row input { flex: 1 1 180px; min-width: 0; width: auto; }
 
+    .pkg-pick { margin: 0 0 16px; }
+    .pkg-pick-label {
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .pkg-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .pkg-card {
+      text-align: left;
+      background: #021820;
+      border: 1px solid #12343c;
+      border-radius: 12px;
+      padding: 14px 14px 12px;
+      cursor: pointer;
+      color: inherit;
+      font: inherit;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 3px;
+      min-height: 92px;
+    }
+    .pkg-card b { font-size: 14px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.25; }
+    .pkg-avail { color: #34d399; font-size: 13px; font-weight: 600; }
+    .pkg-sold { color: #64748b; font-size: 12px; }
+    .pkg-card.is-on {
+      border-color: #26bfb0;
+      box-shadow: 0 0 0 1px #26bfb0;
+    }
+    .pkg-card:hover { border-color: #1a6b62; }
+
+    @media (max-width: 1200px) {
+      .pkg-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
     /* Responsive Mobile Polish */
     @media (max-width: 960px) {
       .app-shell { grid-template-columns: 1fr; padding: 10px; gap: 10px; }
@@ -453,6 +495,7 @@
       .topbar-inner { flex-wrap: wrap; }
       .topbar-actions { width: 100%; justify-content: flex-start; }
       .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .pkg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .grid-2 { grid-template-columns: 1fr; }
       .grid-2.pair { grid-template-columns: 1fr 1fr; }
     }
@@ -704,17 +747,11 @@
 
       <!-- TAB 2: TOKENS -->
       <section id="tab-vouchers" class="tab-pane hidden">
-        <section class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-top">
-              <span>Token Stock</span>
-              <svg class="ico ico-sm c-blue" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-            </div>
-            <div class="stat-val c-blue" id="stTokens">0</div>
-          </div>
-        </section>
-        <div class="grid-2">
-          <div class="card">
+        <div class="pkg-pick">
+          <div class="pkg-pick-label">Select package</div>
+          <div class="pkg-grid" id="pkgCards"></div>
+        </div>
+        <div class="card">
             <div class="card-head">
               <div class="card-title">
                 <svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -736,29 +773,6 @@
                 Encrypt & Save Stock
               </button>
             </form>
-          </div>
-
-          <div class="card">
-            <div class="card-head">
-              <div class="card-title">
-                <svg class="ico" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-                Stock Summary
-              </div>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Package</th>
-                    <th>Code</th>
-                    <th>Available</th>
-                    <th>Used</th>
-                  </tr>
-                </thead>
-                <tbody id="voucherSummaryBody"></tbody>
-              </table>
-            </div>
-          </div>
         </div>
 
         <div class="card">
@@ -966,6 +980,25 @@
       }[ch]));
     }
 
+    function packageTitle(p) {
+      if (p.package_code === 'FF_WEEKLY') return 'Weekly Membership';
+      if (p.package_code === 'FF_MONTHLY') return 'Monthly Membership';
+      const match = String(p.name || '').match(/(\d+)\s*diamond/i);
+      if (match) return match[1] + ' Diamond';
+      return p.name || p.package_code;
+    }
+
+    function renderPackageCards(packages) {
+      const selected = document.getElementById('vPkgCode').value;
+      document.getElementById('pkgCards').innerHTML = packages.map((p) => `
+        <button type="button" class="pkg-card${p.package_code === selected ? ' is-on' : ''}" data-code="${esc(p.package_code)}">
+          <b>${esc(packageTitle(p))}</b>
+          <span class="pkg-avail">${Number(p.available_tokens) || 0} available</span>
+          <span class="pkg-sold">${Number(p.used_tokens) || 0} sold</span>
+        </button>
+      `).join('');
+    }
+
     async function api(url, opts = {}) {
       const savedToken = localStorage.getItem('arora_admin_token') || '';
       const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
@@ -1065,22 +1098,15 @@
       document.getElementById('stTotal').textContent = d.stats.total_orders;
       document.getElementById('stDone').textContent = d.stats.completed_orders;
       document.getElementById('stProc').textContent = d.stats.processing_orders;
-      document.getElementById('stTokens').textContent = d.stats.total_available_tokens;
       document.getElementById('stBal').textContent = d.stats.total_account_balance;
 
-      const pkgOpts = d.packages
-        .map((p) => `<option value="${p.package_code}">${p.name} (${p.package_code}) — Stock: ${p.available_tokens}</option>`)
+      const pkgSelect = document.getElementById('vPkgCode');
+      const keepPkg = pkgSelect.value;
+      pkgSelect.innerHTML = d.packages
+        .map((p) => `<option value="${p.package_code}">${packageTitle(p)} (${p.package_code}) — Stock: ${p.available_tokens}</option>`)
         .join('');
-      document.getElementById('vPkgCode').innerHTML = pkgOpts;
-
-      document.getElementById('voucherSummaryBody').innerHTML = d.packages.map((p) => `
-        <tr>
-          <td><b>${p.name}</b></td>
-          <td><code>${p.package_code}</code></td>
-          <td><span class="pill ${p.available_tokens > p.low_stock_threshold ? 'pill-green' : 'pill-amber'}">${p.available_tokens}</span></td>
-          <td>${p.used_tokens}</td>
-        </tr>
-      `).join('');
+      if (keepPkg && d.packages.some((p) => p.package_code === keepPkg)) pkgSelect.value = keepPkg;
+      renderPackageCards(d.packages);
 
       loadedAccounts = d.accounts || [];
       document.getElementById('accountsBody').innerHTML = loadedAccounts.length === 0
@@ -1270,6 +1296,18 @@
           </tr>
         `).join('');
     }
+
+    document.getElementById('pkgCards').addEventListener('click', (e) => {
+      const card = e.target.closest('.pkg-card');
+      if (!card) return;
+      document.getElementById('vPkgCode').value = card.dataset.code;
+      document.querySelectorAll('.pkg-card').forEach((el) => el.classList.toggle('is-on', el === card));
+    });
+
+    document.getElementById('vPkgCode').addEventListener('change', () => {
+      const code = document.getElementById('vPkgCode').value;
+      document.querySelectorAll('.pkg-card').forEach((el) => el.classList.toggle('is-on', el.dataset.code === code));
+    });
 
     document.getElementById('voucherForm').addEventListener('submit', async (e) => {
       e.preventDefault();
