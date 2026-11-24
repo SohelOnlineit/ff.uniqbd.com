@@ -899,18 +899,19 @@
       </section>
 
       <section id="tab-settings" class="tab-pane hidden">
-        <div class="card" style="max-width:560px;">
+        <div style="display:grid;gap:16px;max-width:560px;">
+        <div class="card">
           <div class="card-head">
             <div class="card-title">
               <svg class="ico" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
               Security
             </div>
-            <span class="card-sub">Same idea as AmarPin account security</span>
+            <span class="card-sub">Admin ID and password</span>
           </div>
           <form id="securityForm">
             <div class="field">
-              <label for="secUser">Username</label>
-              <input type="text" id="secUser" readonly />
+              <label for="secUser">Admin ID</label>
+              <input type="text" id="secUser" required minlength="3" maxlength="32" autocomplete="username" />
             </div>
             <div class="field">
               <label for="secCurrent">Current password</label>
@@ -918,15 +919,42 @@
             </div>
             <div class="field">
               <label for="secNext">New password</label>
-              <input type="password" id="secNext" required minlength="8" maxlength="128" autocomplete="new-password" />
+              <input type="password" id="secNext" minlength="8" maxlength="128" autocomplete="new-password" placeholder="Leave blank to keep the current password" />
             </div>
             <div class="field">
               <label for="secConfirm">Confirm new password</label>
-              <input type="password" id="secConfirm" required minlength="8" maxlength="128" autocomplete="new-password" />
+              <input type="password" id="secConfirm" minlength="8" maxlength="128" autocomplete="new-password" placeholder="Leave blank to keep the current password" />
             </div>
             <p id="secErr" style="color:#fb7185;font-size:12px;margin:0 0 10px;"></p>
-            <button type="submit" class="btn btn-primary">Update password</button>
+            <button type="submit" class="btn btn-primary">Save login</button>
           </form>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">
+              <svg class="ico" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              Telegram Bot
+            </div>
+            <span class="pill pill-amber" id="tgBadge">Off</span>
+          </div>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:12px;">Create a bot with @BotFather, open it, send /start, then paste the bot token and your chat ID. New orders and delivered orders are sent to that chat.</p>
+          <form id="telegramForm">
+            <div class="field">
+              <label for="tgChat">Chat ID</label>
+              <input type="text" id="tgChat" inputmode="numeric" autocomplete="off" placeholder="123456789" />
+            </div>
+            <div class="field">
+              <label for="tgToken">Bot token</label>
+              <input type="password" id="tgToken" autocomplete="new-password" placeholder="123456789:ABC..." />
+            </div>
+            <p id="tgErr" style="color:#fb7185;font-size:12px;margin:0 0 10px;"></p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="submit" class="btn btn-primary">Save bot</button>
+              <button type="button" class="btn btn-secondary" id="tgTest">Send test</button>
+              <button type="button" class="btn btn-danger" id="tgOff">Disconnect</button>
+            </div>
+          </form>
+        </div>
         </div>
       </section>
     </main>
@@ -1103,6 +1131,8 @@
           extBadge.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;"></span> Extension Offline (${lastTxt})`;
         }
       }
+
+      fillTelegram(d.security_info);
 
       document.getElementById('stTotal').textContent = d.stats.total_orders;
       document.getElementById('stDone').textContent = d.stats.completed_orders;
@@ -1516,6 +1546,66 @@
       if (app && !app.classList.contains('hidden')) loadDashboard();
     }, 15000);
 
+    function fillTelegram(info) {
+      const badge = document.getElementById('tgBadge');
+      const chat = document.getElementById('tgChat');
+      const token = document.getElementById('tgToken');
+      if (!badge || !chat || !token) return;
+      const on = Boolean(info && info.telegram_connected);
+      badge.textContent = on ? 'Connected' : 'Off';
+      badge.className = 'pill ' + (on ? 'pill-green' : 'pill-amber');
+      if (document.activeElement !== chat) chat.value = (info && info.telegram_chat_id) || '';
+      if (document.activeElement !== token) {
+        token.placeholder = info && info.telegram_has_token ? 'Saved. Leave blank to keep it.' : '123456789:ABC...';
+      }
+    }
+
+    document.getElementById('telegramForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('tgErr');
+      err.textContent = '';
+      const r = await api('/admin-api/telegram', {
+        method: 'POST',
+        body: JSON.stringify({
+          chat_id: document.getElementById('tgChat').value.trim(),
+          bot_token: document.getElementById('tgToken').value.trim(),
+        }),
+      });
+      if (r.ok) {
+        document.getElementById('tgToken').value = '';
+        showToast(r.message || 'Telegram bot saved.');
+        loadDashboard();
+      } else {
+        err.textContent = r.error || 'Could not save the Telegram bot.';
+      }
+    });
+
+    document.getElementById('tgTest').addEventListener('click', async () => {
+      const err = document.getElementById('tgErr');
+      err.textContent = '';
+      const r = await api('/admin-api/telegram/test', { method: 'POST', body: '{}' });
+      if (r.ok) showToast(r.message || 'Test alert sent.');
+      else err.textContent = r.error || 'Telegram test failed.';
+    });
+
+    document.getElementById('tgOff').addEventListener('click', async () => {
+      if (!confirm('Disconnect the Telegram bot?')) return;
+      const err = document.getElementById('tgErr');
+      err.textContent = '';
+      const r = await api('/admin-api/telegram', {
+        method: 'POST',
+        body: JSON.stringify({ disconnect: true }),
+      });
+      if (r.ok) {
+        document.getElementById('tgToken').value = '';
+        document.getElementById('tgChat').value = '';
+        showToast(r.message || 'Telegram disconnected.');
+        loadDashboard();
+      } else {
+        err.textContent = r.error || 'Could not disconnect.';
+      }
+    });
+
     document.getElementById('securityForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const err = document.getElementById('secErr');
@@ -1523,25 +1613,28 @@
       err.textContent = '';
       const next = document.getElementById('secNext').value;
       const confirm = document.getElementById('secConfirm').value;
-      if (next !== confirm) {
+      if ((next || confirm) && next !== confirm) {
         err.textContent = 'New passwords do not match.';
         return;
       }
       const r = await api('/admin-api/password', {
         method: 'POST',
         body: JSON.stringify({
+          username: userBox.value.trim(),
           current_password: document.getElementById('secCurrent').value,
           new_password: next,
           confirm_password: confirm,
         }),
       });
       if (r.ok) {
-        const name = userBox.value;
-        document.getElementById('securityForm').reset();
-        userBox.value = name;
-        showToast('Password updated.');
+        if (r.token) localStorage.setItem('arora_admin_token', r.token);
+        userBox.value = r.username || userBox.value.trim();
+        document.getElementById('secCurrent').value = '';
+        document.getElementById('secNext').value = '';
+        document.getElementById('secConfirm').value = '';
+        showToast(r.message || 'Login updated.');
       } else {
-        err.textContent = r.error || 'Could not update the password.';
+        err.textContent = r.error || 'Could not update the login.';
       }
     });
 

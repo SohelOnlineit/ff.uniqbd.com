@@ -217,18 +217,40 @@ function verifyPassword(password, stored) {
 
 function changeAdminPassword(username, body) {
   const current = String(body.current_password || '').trim();
+  const nextName = String(body.username || username).trim();
   const next = String(body.new_password || '').trim();
   const confirm = String(body.confirm_password || '').trim();
-  if (!current || !next) return { status: 400, body: { ok: false, error: 'Enter the current and new password.' } };
-  if (next.length < 8 || next.length > 128) return { status: 400, body: { ok: false, error: 'New password must be 8 to 128 characters.' } };
-  if (next !== confirm) return { status: 400, body: { ok: false, error: 'New passwords do not match.' } };
-  if (next === current) return { status: 400, body: { ok: false, error: 'Choose a different password.' } };
+  const changingPass = next.length > 0 || confirm.length > 0;
+  if (!current) return { status: 400, body: { ok: false, error: 'Enter the current password.' } };
+  if (!/^[A-Za-z0-9._-]{3,32}$/.test(nextName)) {
+    return { status: 400, body: { ok: false, error: 'Admin ID must be 3 to 32 letters, numbers, dots, dashes, or underscores.' } };
+  }
+  if (changingPass) {
+    if (next.length < 8 || next.length > 128) return { status: 400, body: { ok: false, error: 'New password must be 8 to 128 characters.' } };
+    if (next !== confirm) return { status: 400, body: { ok: false, error: 'New passwords do not match.' } };
+    if (next === current) return { status: 400, body: { ok: false, error: 'Choose a different password.' } };
+  }
+  if (nextName === username && !changingPass) {
+    return { status: 400, body: { ok: false, error: 'Change the admin ID or the password.' } };
+  }
   const row = pgOne(`SELECT username, password_hash FROM admins WHERE username = ${sqlString(username)} LIMIT 1`);
   if (!row || !verifyPassword(current, row.password_hash)) {
     return { status: 400, body: { ok: false, error: 'Current password is wrong.' } };
   }
-  pg(`UPDATE admins SET password_hash = ${sqlString(hashPassword(next))} WHERE username = ${sqlString(username)}`);
-  return { status: 200, body: { ok: true } };
+  if (nextName !== username) {
+    const taken = pgOne(`SELECT username FROM admins WHERE username = ${sqlString(nextName)} LIMIT 1`);
+    if (taken) return { status: 400, body: { ok: false, error: 'That admin ID is already used.' } };
+  }
+  const sets = [];
+  if (nextName !== username) sets.push(`username = ${sqlString(nextName)}`);
+  if (changingPass) sets.push(`password_hash = ${sqlString(hashPassword(next))}`);
+  pg(`UPDATE admins SET ${sets.join(', ')} WHERE username = ${sqlString(username)}`);
+  const message = nextName !== username && changingPass
+    ? 'Admin ID and password updated.'
+    : nextName !== username
+      ? 'Admin ID updated.'
+      : 'Password updated.';
+  return { status: 200, body: { ok: true, username: nextName, token: signToken(nextName), message } };
 }
 
 function signToken(username) {
@@ -310,6 +332,90 @@ function maskCode(value) {
 function resellerRow() {
   return pgOne(`SELECT id, api_key, api_secret, is_active, webhook_url
     FROM resellers ORDER BY id LIMIT 1`);
+}
+
+function validChatId(value) {
+  return /^-?\d{5,20}$/.test(String(value || '').trim());
+}
+
+function validBotToken(value) {
+  return /^\d{6,15}:[A-Za-z0-9_-]{30,120}$/.test(String(value || '').trim());
+}
+
+async function sendTelegramMessage(token, chatId, text) {
+  const response = await fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: String(text).slice(0, 3500),
+      disable_web_page_preview: true,
+    }),
+    signal: AbortSignal.timeout(8000),
+  });
+  let data = {};
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
+  if (!response.ok || !data.ok) {
+    const desc = String((data && data.description) || 'Telegram did not accept the message.')
+      .replace(/bot\d+:[A-Za-z0-9_-]+/gi, 'bot')
+      .slice(0, 160);
+    throw new Error(desc);
+  }
+}
+
+function notifyTelegram(text) {
+  let row;
+  try {
+    row = pgOne(`SELECT telegram_bot_token_encrypted, telegram_chat_id FROM resellers ORDER BY id LIMIT 1`);
+  } catch {
+    return;
+  }
+  if (!row || !row.telegram_chat_id || !row.telegram_bot_token_encrypted) return;
+  const token = decryptSecret(row.telegram_bot_token_encrypted);
+  if (!token) return;
+  sendTelegramMessage(token, row.telegram_chat_id, text).catch((err) => {
+    console.error('telegram notify failed:', String((err && err.message) || 'send failed').slice(0, 160));
+  });
+}
+
+function saveTelegram(body) {
+  const row = pgOne(`SELECT id, telegram_bot_token_encrypted FROM resellers ORDER BY id LIMIT 1`);
+  if (!row) return { status: 400, body: { ok: false, error: 'No shop connection is set up.' } };
+  if (body.disconnect) {
+    pg(`UPDATE resellers SET telegram_bot_token_encrypted = NULL, telegram_chat_id = NULL WHERE id = ${Number(row.id)}`);
+    return { status: 200, body: { ok: true, message: 'Telegram disconnected.' } };
+  }
+  const chatId = String(body.chat_id || '').trim();
+  const token = String(body.bot_token || '').trim();
+  if (!validChatId(chatId)) {
+    return { status: 400, body: { ok: false, error: 'Chat ID should be the number from Telegram.' } };
+  }
+  const saved = String(row.telegram_bot_token_encrypted || '').startsWith('aes256gcm$');
+  if (!token && !saved) return { status: 400, body: { ok: false, error: 'Bot token is required.' } };
+  if (token && !validBotToken(token)) return { status: 400, body: { ok: false, error: 'That bot token does not look right.' } };
+  const sets = [`telegram_chat_id = ${sqlString(chatId)}`];
+  if (token) sets.push(`telegram_bot_token_encrypted = ${sqlString(encryptSecret(token))}`);
+  pg(`UPDATE resellers SET ${sets.join(', ')} WHERE id = ${Number(row.id)}`);
+  return { status: 200, body: { ok: true, message: 'Telegram bot saved.' } };
+}
+
+async function testTelegram() {
+  const row = pgOne(`SELECT telegram_bot_token_encrypted, telegram_chat_id FROM resellers ORDER BY id LIMIT 1`);
+  if (!row || !row.telegram_chat_id || !row.telegram_bot_token_encrypted) {
+    return { status: 400, body: { ok: false, error: 'Save the bot token and chat ID first.' } };
+  }
+  const token = decryptSecret(row.telegram_bot_token_encrypted);
+  if (!token) return { status: 400, body: { ok: false, error: 'Saved bot token could not be read. Paste it again.' } };
+  try {
+    await sendTelegramMessage(token, row.telegram_chat_id, 'FF.UniQbd test alert. Telegram is connected.');
+    return { status: 200, body: { ok: true, message: 'Test alert sent.' } };
+  } catch (err) {
+    return { status: 400, body: { ok: false, error: String((err && err.message) || 'Telegram test failed.') } };
+  }
 }
 
 function resellerAuth(req) {
@@ -395,6 +501,7 @@ function placeResellerOrder(reseller, body, ip) {
         1, 'none', 'QUEUED_EXT', ${Number(reseller.id)}, ${sqlString(resellerOrderId)}, ${unitPrice}, ${sqlString(ip)}
       )`);
     created.push({ arora_order_utr: utr, status: 'QUEUED_EXT', package_code: pack.package_code, package_name: pack.name });
+    notifyTelegram('New Free Fire order\n' + utr + '\n' + pack.name + '\nUID ' + playerUid);
   }
   const first = created[0];
   return {
@@ -547,6 +654,7 @@ function finishExtensionOrder(body) {
     const pack = pgOne(`SELECT unipin_uc_cost FROM ff_packages WHERE package_code = ${sqlString(order.package_code)} LIMIT 1`) || {};
     pg(`UPDATE unipin_loaded_accounts SET balance = balance - ${num(pack.unipin_uc_cost)} WHERE id = ${Number(order.account_id)}`);
   }
+  notifyTelegram('Order delivered\n' + order.arora_order_utr + '\n' + order.package_name + '\nUID ' + order.player_uid);
   const reseller = resellerRow();
   if (!reseller || !reseller.webhook_url) return;
   const uniqbdOrderId = String(order.reseller_order_id || '').split('#')[0].split(':')[0];
@@ -735,8 +843,10 @@ function dashboard() {
   const balance = pgOne('SELECT COALESCE(SUM(balance), 0) AS n FROM unipin_loaded_accounts') || {};
   const ext = pgOne('SELECT last_seen_at FROM extension_status LIMIT 1') || {};
   const reseller = pgOne(`
-    SELECT extension_key, allowed_ips,
-           (telegram_chat_id IS NOT NULL AND length(telegram_chat_id) > 0) AS telegram_connected
+    SELECT extension_key, allowed_ips, telegram_chat_id,
+           (telegram_bot_token_encrypted IS NOT NULL AND telegram_bot_token_encrypted LIKE 'aes256gcm$%') AS telegram_has_token,
+           (telegram_bot_token_encrypted IS NOT NULL AND telegram_bot_token_encrypted LIKE 'aes256gcm$%'
+             AND telegram_chat_id IS NOT NULL AND length(telegram_chat_id) > 0) AS telegram_connected
     FROM resellers
     ORDER BY id
     LIMIT 1
@@ -783,7 +893,9 @@ function dashboard() {
       encryption: 'AES-256',
       auth_scheme: 'Bearer',
       allowed_ips: reseller.allowed_ips || '127.0.0.1',
-      telegram_connected: Boolean(reseller.telegram_connected),
+      telegram_connected: flagOn(reseller.telegram_connected),
+      telegram_has_token: flagOn(reseller.telegram_has_token),
+      telegram_chat_id: reseller.telegram_chat_id || '',
     },
     uniqbd: uniqbdLink(),
   };
@@ -793,7 +905,9 @@ function applyAdminReset() {
   const password = String(process.env.RESET_ADMIN_PASSWORD || '').trim();
   if (!password) return;
   const hash = hashPassword(password);
-  pg("UPDATE admins SET password_hash = " + sqlString(hash) + " WHERE username = 'aroraadmin'");
+  const target = pgOne("SELECT username FROM admins WHERE username = 'aroraadmin' LIMIT 1")
+    || pgOne('SELECT username FROM admins ORDER BY username LIMIT 1');
+  if (target) pg(`UPDATE admins SET password_hash = ${sqlString(hash)} WHERE username = ${sqlString(target.username)}`);
   if (fs.existsSync(envFile)) {
     const raw = fs.readFileSync(envFile, 'utf8');
     const lines = raw.split(/\r?\n/);
@@ -862,6 +976,28 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname === '/admin-api/logout' && req.method === 'POST') {
     return sendJson(res, 200, { ok: true });
+  }
+
+  if (pathname === '/admin-api/telegram' && req.method === 'POST') {
+    if (!readToken(req)) return sendJson(res, 401, { ok: false });
+    try {
+      const result = saveTelegram(JSON.parse(await readBody(req) || '{}'));
+      return sendJson(res, result.status, result.body);
+    } catch (err) {
+      console.error('telegram save failed:', dbError(err));
+      return sendJson(res, 500, { ok: false, error: 'Could not save the Telegram bot.' });
+    }
+  }
+
+  if (pathname === '/admin-api/telegram/test' && req.method === 'POST') {
+    if (!readToken(req)) return sendJson(res, 401, { ok: false });
+    try {
+      const result = await testTelegram();
+      return sendJson(res, result.status, result.body);
+    } catch (err) {
+      console.error('telegram test failed:', dbError(err));
+      return sendJson(res, 500, { ok: false, error: 'Telegram test failed.' });
+    }
   }
 
   if (pathname === '/admin-api/dashboard') {
