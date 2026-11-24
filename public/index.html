@@ -534,8 +534,46 @@
     .pkg-card.is-on {
       border-color: #26bfb0;
       box-shadow: 0 0 0 1px #26bfb0;
+      background: rgba(38, 191, 176, 0.08);
     }
     .pkg-card:hover { border-color: #1a6b62; }
+    .pkg-now {
+      margin-top: 4px;
+      color: #5eead4;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .token-focus {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin: 0 0 16px;
+      padding: 16px 18px;
+      border: 1px solid rgba(38, 191, 176, 0.4);
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(38, 191, 176, 0.14), #021820 70%);
+    }
+    .token-focus h2 {
+      margin-top: 2px;
+      font-size: 24px;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+    }
+    .token-counts { display: flex; flex-wrap: wrap; gap: 8px; }
+    .token-count {
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid #12343c;
+      background: #02141b;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .token-count-on { color: #34d399; border-color: rgba(52, 211, 153, 0.35); }
+    .token-note { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
     .tg-alerts { display: grid; gap: 8px; margin: 0 0 14px; }
     .tg-alert {
       display: flex;
@@ -623,6 +661,8 @@
       .topbar-actions { width: 100%; justify-content: flex-start; }
       .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .pkg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .token-focus { flex-direction: column; align-items: flex-start; }
+      .token-focus h2 { font-size: 20px; }
       .set-grid { grid-template-columns: 1fr; }
       .info-grid { grid-template-columns: 1fr; }
       .grid-2 { grid-template-columns: 1fr; }
@@ -944,22 +984,30 @@
           </div>
         </section>
         <div class="pkg-pick">
-          <div class="pkg-pick-label">Select package</div>
+          <div class="pkg-pick-label">Select a package</div>
           <div class="pkg-grid" id="pkgCards"></div>
+        </div>
+        <div class="token-focus">
+          <div>
+            <div class="pkg-pick-label">Showing tokens for</div>
+            <h2 id="tokenPkgName">Select a package</h2>
+          </div>
+          <div class="token-counts">
+            <span class="token-count token-count-on" id="tokenAvail">0 available</span>
+            <span class="token-count" id="tokenUsed">0 used</span>
+          </div>
         </div>
         <div class="card">
             <div class="card-head">
               <div class="card-title">
                 <svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                Add UniPin Tokens
+                <span id="tokenAddTitle">Add tokens</span>
               </div>
               <span class="card-sub">No PIN needed</span>
             </div>
             <form id="voucherForm">
-              <div class="field">
-                <label for="vPkgCode">Package</label>
-                <select id="vPkgCode" required></select>
-              </div>
+              <select id="vPkgCode" class="hidden" aria-hidden="true" tabindex="-1" required></select>
+              <p class="token-note" id="tokenAddNote">Pick a package above. New tokens are saved for that package only.</p>
               <div class="field">
                 <label for="vTokensText">Tokens (one per line)</label>
                 <textarea id="vTokensText" placeholder="UPBD-XXXX-XXXX-1111&#10;UPBD-XXXX-XXXX-2222"></textarea>
@@ -975,15 +1023,14 @@
           <div class="card-head">
             <div class="card-title">
               <svg class="ico" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-              Stored Tokens
+              <span id="tokenListTitle">Package tokens</span>
             </div>
-            <span class="card-sub">Masked for security</span>
+            <span class="card-sub" id="tokenListCount">Masked for security</span>
           </div>
           <div class="table-wrap tokens-table">
             <table>
               <thead>
                 <tr>
-                  <th>Code</th>
                   <th>Token</th>
                   <th>Status</th>
                   <th>Order ID</th>
@@ -1419,19 +1466,54 @@
     }
 
     function packageCardsHtml(packages, selectable) {
-      const selected = selectable ? document.getElementById('vPkgCode').value : '';
+      const selected = selectable ? selectedPackageCode : '';
       return packages.map((p) => {
         const on = selectable && p.package_code === selected;
-        const inner = `<b>${esc(packageTitle(p))}</b><span class="pkg-avail">${Number(p.available_tokens) || 0} available</span><span class="pkg-sold">${Number(p.used_tokens) || 0} sold</span>`;
+        const inner = `<b>${esc(packageTitle(p))}</b><span class="pkg-avail">${Number(p.available_tokens) || 0} available</span><span class="pkg-sold">${Number(p.used_tokens) || 0} sold</span>${on ? '<span class="pkg-now">Showing</span>' : ''}`;
         if (!selectable) return `<div class="pkg-card">${inner}</div>`;
         return `<button type="button" class="pkg-card${on ? ' is-on' : ''}" data-code="${esc(p.package_code)}">${inner}</button>`;
       }).join('');
     }
 
+    let deskPackages = [];
+    let stockTokens = [];
+    let selectedPackageCode = '';
+
     function renderPackageCards(packages) {
-      document.getElementById('pkgCards').innerHTML = packageCardsHtml(packages, true);
+      deskPackages = packages || [];
+      document.getElementById('pkgCards').innerHTML = packageCardsHtml(deskPackages, true);
       const dash = document.getElementById('dashPkgCards');
-      if (dash) dash.innerHTML = packageCardsHtml(packages, false);
+      if (dash) dash.innerHTML = packageCardsHtml(deskPackages, false);
+      renderTokenList();
+    }
+
+    function renderTokenList() {
+      const nameEl = document.getElementById('tokenPkgName');
+      if (!nameEl) return;
+      const pkg = deskPackages.find((row) => row.package_code === selectedPackageCode) || null;
+      const title = pkg ? packageTitle(pkg) : 'Select a package';
+      const rows = pkg ? stockTokens.filter((row) => row.package_code === pkg.package_code) : [];
+      const available = pkg ? Number(pkg.available_tokens) || 0 : 0;
+      const used = pkg ? Number(pkg.used_tokens) || 0 : 0;
+      nameEl.textContent = title;
+      document.getElementById('tokenAvail').textContent = available + ' available';
+      document.getElementById('tokenUsed').textContent = used + ' sold';
+      document.getElementById('tokenAddTitle').textContent = pkg ? 'Add ' + title + ' tokens' : 'Add tokens';
+      document.getElementById('tokenAddNote').textContent = pkg
+        ? 'These tokens are saved for ' + title + ' only.'
+        : 'Pick a package above. New tokens are saved for that package only.';
+      document.getElementById('tokenListTitle').textContent = pkg ? title + ' tokens' : 'Package tokens';
+      document.getElementById('tokenListCount').textContent = rows.length === 1 ? '1 token' : rows.length + ' tokens';
+      document.getElementById('vouchersListBody').innerHTML = rows.length === 0
+        ? `<tr><td colspan="4" class="empty-row" style="color:var(--muted);">${pkg ? 'No tokens saved for ' + esc(title) + '.' : 'Select a package to see its tokens.'}</td></tr>`
+        : rows.map((v) => `
+          <tr>
+            <td data-label="Token"><span class="cell-val"><code id="tok-${Number(v.id)}">${esc(v.masked_code)}</code><button type="button" class="tok-eye" onclick="toggleToken(${Number(v.id)}, this)" title="Show token">${ICONS.eye}</button></span></td>
+            <td data-label="Status"><span class="pill ${v.status === 'available' ? 'pill-green' : 'pill-blue'}">${v.status === 'available' ? 'Available' : 'Used'}</span></td>
+            <td data-label="Order">${v.used_order_utr || v.shop_order_number ? `<code>${esc(orderIdText(v))}</code>` : '-'}</td>
+            <td data-label="Action">${v.status === 'available' ? `<button class="btn btn-danger btn-sm" onclick="delVoucher(${Number(v.id)})">${ICONS.trash}</button>` : '-'}</td>
+          </tr>
+        `).join('');
     }
 
     async function api(url, opts = {}) {
@@ -1707,11 +1789,12 @@
       });
 
       const pkgSelect = document.getElementById('vPkgCode');
-      const keepPkg = pkgSelect.value;
+      const keepPkg = selectedPackageCode || pkgSelect.value;
       pkgSelect.innerHTML = d.packages
         .map((p) => `<option value="${esc(p.package_code)}">${esc(packageTitle(p))} (${esc(p.package_code)}) — Stock: ${Number(p.available_tokens) || 0}</option>`)
         .join('');
       if (keepPkg && d.packages.some((p) => p.package_code === keepPkg)) pkgSelect.value = keepPkg;
+      selectedPackageCode = pkgSelect.value;
       renderPackageCards(d.packages);
 
       loadedAccounts = d.accounts || [];
@@ -1863,32 +1946,24 @@
       }
     }
 
+    function rememberTokens(rows) {
+      stockTokens = Array.isArray(rows) ? rows : [];
+      renderTokenList();
+    }
+
     async function loadVouchers() {
       const r = await api('/admin-api/vouchers');
       if (!r.ok) return;
-      document.getElementById('vouchersListBody').innerHTML = r.vouchers.length === 0
-        ? '<tr><td colspan="5" class="empty-row" style="color:var(--muted);">No tokens in stock.</td></tr>'
-        : r.vouchers.map((v) => `
-          <tr>
-            <td data-label="Code"><code>${esc(v.package_code)}</code></td>
-            <td data-label="Token"><span class="cell-val"><code id="tok-${Number(v.id)}">${esc(v.masked_code)}</code><button type="button" class="tok-eye" onclick="toggleToken(${Number(v.id)}, this)" title="Show token">${ICONS.eye}</button></span></td>
-            <td data-label="Status"><span class="pill ${v.status === 'available' ? 'pill-green' : 'pill-blue'}">${v.status === 'available' ? 'Available' : 'Used'}</span></td>
-            <td data-label="Order">${v.used_order_utr || v.shop_order_number ? `<code>${esc(orderIdText(v))}</code>` : '-'}</td>
-            <td data-label="Action">${v.status === 'available' ? `<button class="btn btn-danger btn-sm" onclick="delVoucher(${Number(v.id)})">${ICONS.trash}</button>` : '-'}</td>
-          </tr>
-        `).join('');
+      rememberTokens(r.vouchers);
     }
 
     document.getElementById('pkgCards').addEventListener('click', (e) => {
       const card = e.target.closest('.pkg-card');
       if (!card) return;
-      document.getElementById('vPkgCode').value = card.dataset.code;
-      document.querySelectorAll('.pkg-card').forEach((el) => el.classList.toggle('is-on', el === card));
-    });
-
-    document.getElementById('vPkgCode').addEventListener('change', () => {
-      const code = document.getElementById('vPkgCode').value;
-      document.querySelectorAll('.pkg-card').forEach((el) => el.classList.toggle('is-on', el.dataset.code === code));
+      selectedPackageCode = card.dataset.code || '';
+      const pkgSelect = document.getElementById('vPkgCode');
+      if ([...pkgSelect.options].some((opt) => opt.value === selectedPackageCode)) pkgSelect.value = selectedPackageCode;
+      renderPackageCards(deskPackages);
     });
 
     document.getElementById('voucherForm').addEventListener('submit', async (e) => {
