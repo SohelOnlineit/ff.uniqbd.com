@@ -439,6 +439,28 @@
     }
     .sec-row span:first-child { color: var(--muted); display: inline-flex; align-items: center; gap: 7px; }
 
+    .ask-back {
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(1, 10, 14, 0.72);
+    }
+    .ask-card {
+      width: min(420px, 100%);
+      background: #031a22;
+      border: 1px solid rgba(38, 191, 176, 0.35);
+      border-radius: 18px;
+      padding: 22px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+    }
+    .ask-card strong { display: block; font-size: 18px; margin-bottom: 8px; }
+    .ask-card p { margin: 0 0 18px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .ask-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
     /* Toast */
     .toast {
       position: fixed;
@@ -1103,6 +1125,17 @@
     </div>
   </div>
 
+  <div id="askBack" class="ask-back hidden">
+    <div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="askTitle">
+      <strong id="askTitle">Send this order again?</strong>
+      <p id="askText">The extension will try to deliver the diamonds for this order.</p>
+      <div class="ask-actions">
+        <button type="button" class="btn btn-secondary" id="askNo">Cancel</button>
+        <button type="button" class="btn btn-primary" id="askYes">Send again</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden"></div>
 
   <script>
@@ -1682,8 +1715,38 @@
       loadDashboard();
     }
 
+    function askConfirm(title, text, yesLabel) {
+      const back = document.getElementById('askBack');
+      document.getElementById('askTitle').textContent = title;
+      document.getElementById('askText').textContent = text;
+      document.getElementById('askYes').textContent = yesLabel || 'OK';
+      back.classList.remove('hidden');
+      return new Promise((resolve) => {
+        const yes = document.getElementById('askYes');
+        const no = document.getElementById('askNo');
+        const finish = (value) => {
+          back.classList.add('hidden');
+          yes.removeEventListener('click', onYes);
+          no.removeEventListener('click', onNo);
+          back.removeEventListener('click', onBack);
+          document.removeEventListener('keydown', onKey);
+          resolve(value);
+        };
+        const onYes = () => finish(true);
+        const onNo = () => finish(false);
+        const onBack = (event) => { if (event.target === back) finish(false); };
+        const onKey = (event) => { if (event.key === 'Escape') finish(false); };
+        yes.addEventListener('click', onYes);
+        no.addEventListener('click', onNo);
+        back.addEventListener('click', onBack);
+        document.addEventListener('keydown', onKey);
+        yes.focus();
+      });
+    }
+
     async function retryOrder(id) {
-      if (!confirm('Re-queue this order for Chrome Extension auto-delivery?')) return;
+      const yes = await askConfirm('Send this order again?', 'The extension will try to deliver the diamonds for this order.', 'Send again');
+      if (!yes) return;
       const r = await api(`/admin-api/orders/${id}/retry`, {
         method: 'POST',
         body: JSON.stringify({}),
