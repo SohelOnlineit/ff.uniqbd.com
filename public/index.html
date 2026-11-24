@@ -466,9 +466,64 @@
       box-shadow: 0 0 0 1px #26bfb0;
     }
     .pkg-card:hover { border-color: #1a6b62; }
+    .tg-alerts { display: grid; gap: 8px; margin: 0 0 14px; }
+    .tg-alert {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #02141b;
+      cursor: pointer;
+    }
+    .tg-alert input { width: 16px; height: 16px; margin: 0; padding: 0; flex: 0 0 auto; accent-color: var(--accent); }
+    .tg-alert b { display: block; font-size: 13px; }
+    .tg-alert em { display: block; color: var(--muted); font-style: normal; font-size: 12px; font-weight: 500; }
+    .set-home { display: grid; gap: 14px; }
+    .set-hero, .set-card {
+      background: #021820;
+      border: 1px solid #12343c;
+      border-radius: 16px;
+    }
+    .set-hero { display: flex; align-items: center; gap: 14px; padding: 18px; }
+    .set-kicker { font-size: 11px; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; }
+    .set-hero h2 { font-size: 28px; letter-spacing: -0.03em; line-height: 1.1; margin-top: 2px; }
+    .set-hero p, .set-card em { color: var(--muted); font-size: 13px; font-style: normal; font-weight: 500; }
+    .set-hero p { margin-top: 4px; }
+    .set-ico {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      border: 1px solid rgba(38, 191, 176, 0.35);
+      color: var(--accent);
+      background: rgba(38, 191, 176, 0.08);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+    }
+    .set-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .set-card {
+      text-align: left;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 16px;
+      min-height: 92px;
+    }
+    .set-card strong { display: block; font-size: 15px; margin-bottom: 4px; }
+    .set-card em { display: block; line-height: 1.4; }
+    .set-card:hover { border-color: #1a6b62; }
+    .set-panel { max-width: 640px; }
+    .set-back { margin-bottom: 12px; }
 
     @media (max-width: 1200px) {
       .pkg-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .set-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
     /* Responsive Mobile Polish */
@@ -496,6 +551,7 @@
       .topbar-actions { width: 100%; justify-content: flex-start; }
       .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .pkg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .set-grid { grid-template-columns: 1fr; }
       .grid-2 { grid-template-columns: 1fr; }
       .grid-2.pair { grid-template-columns: 1fr 1fr; }
     }
@@ -630,6 +686,42 @@
 
     <main class="container">
       <section id="tab-website" class="tab-pane">
+        <section class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-top">
+              <span>Total Orders</span>
+              <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg>
+            </div>
+            <div class="stat-val js-total">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-top">
+              <span>Completed</span>
+              <svg class="ico ico-sm c-green" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="stat-val c-green js-done">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-top">
+              <span>Processing</span>
+              <svg class="ico ico-sm c-amber" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="stat-val c-amber js-proc">0</div>
+          </div>
+        </section>
+        <section class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-top">
+              <span>Account Balance (UP)</span>
+              <svg class="ico ico-sm c-green" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            </div>
+            <div class="stat-val c-green js-bal">0</div>
+          </div>
+        </section>
+        <div class="pkg-pick">
+          <div class="pkg-pick-label">Select package</div>
+          <div class="pkg-grid" id="dashPkgCards"></div>
+        </div>
         <div class="card" style="margin-bottom:14px;">
           <div class="card-head">
             <div class="card-title">
@@ -692,21 +784,21 @@
               <span>Total Orders</span>
               <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg>
             </div>
-            <div class="stat-val" id="stTotal">0</div>
+            <div class="stat-val js-total" id="stTotal">0</div>
           </div>
           <div class="stat-card">
             <div class="stat-top">
               <span>Completed</span>
               <svg class="ico ico-sm c-green" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
-            <div class="stat-val c-green" id="stDone">0</div>
+            <div class="stat-val c-green js-done" id="stDone">0</div>
           </div>
           <div class="stat-card">
             <div class="stat-top">
               <span>Processing</span>
               <svg class="ico ico-sm c-amber" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             </div>
-            <div class="stat-val c-amber" id="stProc">0</div>
+            <div class="stat-val c-amber js-proc" id="stProc">0</div>
           </div>
         </section>
         <div class="card">
@@ -897,7 +989,30 @@
       </section>
 
       <section id="tab-settings" class="tab-pane hidden">
-        <div style="display:grid;gap:16px;max-width:560px;">
+        <div id="setHome" class="set-home">
+          <div class="set-hero">
+            <span class="set-ico" aria-hidden="true">
+              <svg class="ico ico-lg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </span>
+            <div>
+              <div class="set-kicker">SETTINGS</div>
+              <h2>General</h2>
+              <p>Shortcuts to this desk. Each button opens that setting.</p>
+            </div>
+          </div>
+          <div class="set-grid">
+            <button type="button" class="set-card" onclick="openSetting('security')">
+              <span class="set-ico" aria-hidden="true"><svg class="ico ico-lg" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+              <span><strong>Security</strong><em>Change the admin ID and login password.</em></span>
+            </button>
+            <button type="button" class="set-card" onclick="openSetting('telegram')">
+              <span class="set-ico" aria-hidden="true"><svg class="ico ico-lg" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></span>
+              <span><strong>Telegram</strong><em>Order alerts for each status.</em></span>
+            </button>
+          </div>
+        </div>
+        <div id="setSecurity" class="set-panel hidden">
+          <button type="button" class="btn btn-secondary btn-sm set-back" onclick="openSetting('')">← General</button>
         <div class="card">
           <div class="card-head">
             <div class="card-title">
@@ -927,6 +1042,9 @@
             <button type="submit" class="btn btn-primary">Save login</button>
           </form>
         </div>
+        </div>
+        <div id="setTelegram" class="set-panel hidden">
+          <button type="button" class="btn btn-secondary btn-sm set-back" onclick="openSetting('')">← General</button>
         <div class="card">
           <div class="card-head">
             <div class="card-title">
@@ -935,7 +1053,15 @@
             </div>
             <span class="pill pill-amber" id="tgBadge">Off</span>
           </div>
-          <p style="color:var(--muted);font-size:13px;margin-bottom:12px;">Create a bot with @BotFather, open it, send /start, then paste the bot token and your chat ID. New orders and delivered orders are sent to that chat.</p>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:12px;">Create a bot with @BotFather, open it, send /start, then paste the bot token and your chat ID. Turn a status on to send that message, or off to stay quiet.</p>
+          <div class="tg-alerts" id="tgAlerts">
+            <label class="tg-alert"><input type="checkbox" data-status="QUEUED_EXT" checked /><span><b>Queued</b><em>New order</em></span></label>
+            <label class="tg-alert"><input type="checkbox" data-status="IN_PROGRESS_EXT" /><span><b>In progress</b><em>Extension started the order</em></span></label>
+            <label class="tg-alert"><input type="checkbox" data-status="PROCESSING" /><span><b>Processing</b><em>Still working, or a UniPin update</em></span></label>
+            <label class="tg-alert"><input type="checkbox" data-status="COMPLETED" checked /><span><b>Completed</b><em>Order delivered</em></span></label>
+            <label class="tg-alert"><input type="checkbox" data-status="PAUSED" /><span><b>Paused</b><em>Order was paused</em></span></label>
+            <label class="tg-alert"><input type="checkbox" data-status="CANCELLED" /><span><b>Cancelled</b><em>Order was cancelled</em></span></label>
+          </div>
           <form id="telegramForm">
             <div class="field">
               <label for="tgChat">Chat ID</label>
@@ -985,6 +1111,16 @@
       setTimeout(() => el.classList.add('hidden'), 3500);
     }
 
+    function openSetting(name) {
+      const home = document.getElementById('setHome');
+      const security = document.getElementById('setSecurity');
+      const telegram = document.getElementById('setTelegram');
+      if (!home || !security || !telegram) return;
+      home.classList.toggle('hidden', Boolean(name));
+      security.classList.toggle('hidden', name !== 'security');
+      telegram.classList.toggle('hidden', name !== 'telegram');
+    }
+
     function switchTab(name, btn) {
       document.querySelectorAll('.tab-pane').forEach((p) => p.classList.add('hidden'));
       document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
@@ -1023,15 +1159,20 @@
       return p.name || p.package_code;
     }
 
+    function packageCardsHtml(packages, selectable) {
+      const selected = selectable ? document.getElementById('vPkgCode').value : '';
+      return packages.map((p) => {
+        const on = selectable && p.package_code === selected;
+        const inner = `<b>${esc(packageTitle(p))}</b><span class="pkg-avail">${Number(p.available_tokens) || 0} available</span><span class="pkg-sold">${Number(p.used_tokens) || 0} sold</span>`;
+        if (!selectable) return `<div class="pkg-card">${inner}</div>`;
+        return `<button type="button" class="pkg-card${on ? ' is-on' : ''}" data-code="${esc(p.package_code)}">${inner}</button>`;
+      }).join('');
+    }
+
     function renderPackageCards(packages) {
-      const selected = document.getElementById('vPkgCode').value;
-      document.getElementById('pkgCards').innerHTML = packages.map((p) => `
-        <button type="button" class="pkg-card${p.package_code === selected ? ' is-on' : ''}" data-code="${esc(p.package_code)}">
-          <b>${esc(packageTitle(p))}</b>
-          <span class="pkg-avail">${Number(p.available_tokens) || 0} available</span>
-          <span class="pkg-sold">${Number(p.used_tokens) || 0} sold</span>
-        </button>
-      `).join('');
+      document.getElementById('pkgCards').innerHTML = packageCardsHtml(packages, true);
+      const dash = document.getElementById('dashPkgCards');
+      if (dash) dash.innerHTML = packageCardsHtml(packages, false);
     }
 
     async function api(url, opts = {}) {
@@ -1132,9 +1273,9 @@
 
       fillTelegram(d.security_info);
 
-      document.getElementById('stTotal').textContent = d.stats.total_orders;
-      document.getElementById('stDone').textContent = d.stats.completed_orders;
-      document.getElementById('stProc').textContent = d.stats.processing_orders;
+      document.querySelectorAll('.js-total').forEach((el) => { el.textContent = d.stats.total_orders; });
+      document.querySelectorAll('.js-done').forEach((el) => { el.textContent = d.stats.completed_orders; });
+      document.querySelectorAll('.js-proc').forEach((el) => { el.textContent = d.stats.processing_orders; });
       document.querySelectorAll('.js-bal').forEach((el) => {
         el.textContent = d.stats.total_account_balance;
       });
@@ -1544,10 +1685,19 @@
       if (app && !app.classList.contains('hidden')) loadDashboard();
     }, 15000);
 
+    function collectTgAlerts() {
+      const alerts = {};
+      document.querySelectorAll('#tgAlerts input[data-status]').forEach((input) => {
+        alerts[input.dataset.status] = input.checked;
+      });
+      return alerts;
+    }
+
     function fillTelegram(info) {
       const badge = document.getElementById('tgBadge');
       const chat = document.getElementById('tgChat');
       const token = document.getElementById('tgToken');
+      const alertsBox = document.getElementById('tgAlerts');
       if (!badge || !chat || !token) return;
       const on = Boolean(info && info.telegram_connected);
       badge.textContent = on ? 'Connected' : 'Off';
@@ -1555,6 +1705,14 @@
       if (document.activeElement !== chat) chat.value = (info && info.telegram_chat_id) || '';
       if (document.activeElement !== token) {
         token.placeholder = info && info.telegram_has_token ? 'Saved. Leave blank to keep it.' : '123456789:ABC...';
+      }
+      const alerts = (info && info.telegram_alerts) || {};
+      if (alertsBox && !alertsBox.contains(document.activeElement)) {
+        alertsBox.querySelectorAll('input[data-status]').forEach((input) => {
+          if (Object.prototype.hasOwnProperty.call(alerts, input.dataset.status)) {
+            input.checked = Boolean(alerts[input.dataset.status]);
+          }
+        });
       }
     }
 
@@ -1567,6 +1725,7 @@
         body: JSON.stringify({
           chat_id: document.getElementById('tgChat').value.trim(),
           bot_token: document.getElementById('tgToken').value.trim(),
+          alerts: collectTgAlerts(),
         }),
       });
       if (r.ok) {
@@ -1576,6 +1735,17 @@
       } else {
         err.textContent = r.error || 'Could not save the Telegram bot.';
       }
+    });
+
+    document.getElementById('tgAlerts').addEventListener('change', async () => {
+      const err = document.getElementById('tgErr');
+      err.textContent = '';
+      const r = await api('/admin-api/telegram', {
+        method: 'POST',
+        body: JSON.stringify({ alerts_only: true, alerts: collectTgAlerts() }),
+      });
+      if (r.ok) showToast('Telegram alerts updated.');
+      else err.textContent = r.error || 'Could not update alerts.';
     });
 
     document.getElementById('tgTest').addEventListener('click', async () => {

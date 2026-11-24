@@ -367,6 +367,45 @@ async function sendTelegramMessage(token, chatId, text) {
   }
 }
 
+const TELEGRAM_STATUSES = ['QUEUED_EXT', 'IN_PROGRESS_EXT', 'PROCESSING', 'COMPLETED', 'PAUSED', 'CANCELLED'];
+const TELEGRAM_ALERT_DEFAULTS = {
+  QUEUED_EXT: true,
+  IN_PROGRESS_EXT: false,
+  PROCESSING: false,
+  COMPLETED: true,
+  PAUSED: false,
+  CANCELLED: false,
+};
+const TELEGRAM_STATUS_LABEL = {
+  QUEUED_EXT: 'Queued',
+  IN_PROGRESS_EXT: 'In progress',
+  PROCESSING: 'Processing',
+  COMPLETED: 'Completed',
+  PAUSED: 'Paused',
+  CANCELLED: 'Cancelled',
+};
+
+function ensureTelegramAlertsColumn() {
+  pg('ALTER TABLE resellers ADD COLUMN IF NOT EXISTS telegram_alerts TEXT');
+}
+
+function telegramAlertMap(raw) {
+  let saved = {};
+  if (raw && typeof raw === 'object') saved = raw;
+  else {
+    try { saved = JSON.parse(raw || '{}'); } catch { saved = {}; }
+  }
+  const out = {};
+  for (const key of TELEGRAM_STATUSES) {
+    if (Object.prototype.hasOwnProperty.call(saved, key)) {
+      out[key] = saved[key] === true || saved[key] === 'true' || saved[key] === 1 || saved[key] === '1';
+    } else {
+      out[key] = TELEGRAM_ALERT_DEFAULTS[key];
+    }
+  }
+  return out;
+}
+
 function notifyTelegram(text) {
   let row;
   try {
@@ -382,12 +421,41 @@ function notifyTelegram(text) {
   });
 }
 
+function notifyOrderStatus(order, status, note) {
+  if (!order || !TELEGRAM_STATUSES.includes(status)) return;
+  let raw = '';
+  try {
+    const row = pgOne('SELECT telegram_alerts FROM resellers ORDER BY id LIMIT 1');
+    raw = row && row.telegram_alerts;
+  } catch {
+    return;
+  }
+  if (!telegramAlertMap(raw)[status]) return;
+  const lines = [
+    'FF.UniQbd · ' + TELEGRAM_STATUS_LABEL[status],
+    order.arora_order_utr || '',
+    order.package_name || '',
+    order.player_uid ? 'UID ' + order.player_uid : '',
+  ];
+  const extra = String(note || '').trim();
+  if (extra && status !== 'COMPLETED' && status !== 'QUEUED_EXT') lines.push(extra.slice(0, 180));
+  notifyTelegram(lines.filter(Boolean).join('\n'));
+}
+
 function saveTelegram(body) {
   const row = pgOne(`SELECT id, telegram_bot_token_encrypted FROM resellers ORDER BY id LIMIT 1`);
   if (!row) return { status: 400, body: { ok: false, error: 'No shop connection is set up.' } };
   if (body.disconnect) {
     pg(`UPDATE resellers SET telegram_bot_token_encrypted = NULL, telegram_chat_id = NULL WHERE id = ${Number(row.id)}`);
     return { status: 200, body: { ok: true, message: 'Telegram disconnected.' } };
+  }
+  if (body.alerts_only) {
+    if (!body.alerts || typeof body.alerts !== 'object') {
+      return { status: 400, body: { ok: false, error: 'Choose which order statuses should send a message.' } };
+    }
+    const alerts = telegramAlertMap(body.alerts);
+    pg(`UPDATE resellers SET telegram_alerts = ${sqlString(JSON.stringify(alerts))} WHERE id = ${Number(row.id)}`);
+    return { status: 200, body: { ok: true, message: 'Telegram alerts updated.', alerts } };
   }
   const chatId = String(body.chat_id || '').trim();
   const token = String(body.bot_token || '').trim();
@@ -399,6 +467,9 @@ function saveTelegram(body) {
   if (token && !validBotToken(token)) return { status: 400, body: { ok: false, error: 'That bot token does not look right.' } };
   const sets = [`telegram_chat_id = ${sqlString(chatId)}`];
   if (token) sets.push(`telegram_bot_token_encrypted = ${sqlString(encryptSecret(token))}`);
+  if (body.alerts && typeof body.alerts === 'object') {
+    sets.push(`telegram_alerts = ${sqlString(JSON.stringify(telegramAlertMap(body.alerts)))}`);
+  }
   pg(`UPDATE resellers SET ${sets.join(', ')} WHERE id = ${Number(row.id)}`);
   return { status: 200, body: { ok: true, message: 'Telegram bot saved.' } };
 }
@@ -501,7 +572,7 @@ function placeResellerOrder(reseller, body, ip) {
         1, 'none', 'QUEUED_EXT', ${Number(reseller.id)}, ${sqlString(resellerOrderId)}, ${unitPrice}, ${sqlString(ip)}
       )`);
     created.push({ arora_order_utr: utr, status: 'QUEUED_EXT', package_code: pack.package_code, package_name: pack.name });
-    notifyTelegram('New Free Fire order\n' + utr + '\n' + pack.name + '\nUID ' + playerUid);
+    notifyOrderStatus({ arora_order_utr: utr, package_name: pack.name, player_uid: playerUid }, 'QUEUED_EXT', '');
   }
   const first = created[0];
   return {
@@ -552,6 +623,7 @@ function claimNextTask() {
     if (plain && parts.serial && parts.pin) {
       pg(`UPDATE unipin_vouchers SET status = 'used', used_order_utr = ${sqlString(order.arora_order_utr)}, used_at = CURRENT_TIMESTAMP WHERE id = ${Number(voucher.id)}`);
       pg(`UPDATE fulfillment_orders SET status = 'IN_PROGRESS_EXT', method_used = 'unipin_voucher', voucher_ids = ${sqlString(String(voucher.id))} WHERE id = ${Number(order.id)}`);
+      notifyOrderStatus(order, 'IN_PROGRESS_EXT', '');
       const channel = voucherChannel(parts.serial);
       return {
         order_utr: order.arora_order_utr,
@@ -580,6 +652,7 @@ function claimNextTask() {
   const pin = decryptSecret(account.security_pin_encrypted);
   if (!email || !password || !pin) return null;
   pg(`UPDATE fulfillment_orders SET status = 'IN_PROGRESS_EXT', method_used = 'loaded_account', account_id = ${Number(account.id)} WHERE id = ${Number(order.id)}`);
+  notifyOrderStatus(order, 'IN_PROGRESS_EXT', '');
   return {
     order_utr: order.arora_order_utr,
     player_uid: order.player_uid,
@@ -591,7 +664,7 @@ function claimNextTask() {
 }
 
 function requeueOrder(id) {
-  const row = pgOne(`SELECT id, arora_order_utr, status FROM fulfillment_orders WHERE id = ${id} LIMIT 1`);
+  const row = pgOne(`SELECT id, arora_order_utr, player_uid, package_name, status FROM fulfillment_orders WHERE id = ${id} LIMIT 1`);
   if (!row) return { status: 404, body: { ok: false, error: 'Order not found' } };
   if (row.status === 'COMPLETED') return { status: 400, body: { ok: false, error: 'Completed orders stay completed' } };
   pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
@@ -599,16 +672,18 @@ function requeueOrder(id) {
   pg(`UPDATE fulfillment_orders
     SET status = 'QUEUED_EXT', method_used = 'none', account_id = NULL, voucher_ids = NULL, status_reason = ''
     WHERE id = ${id}`);
+  if (row.status !== 'QUEUED_EXT') notifyOrderStatus(row, 'QUEUED_EXT', '');
   return { status: 200, body: { ok: true, message: 'Order queued for the extension.' } };
 }
 
 function orderActionResult(id, action, body) {
   if (action === 'retry') return requeueOrder(id);
   if (action === 'toggle-pause') {
-    const row = pgOne(`SELECT id, status FROM fulfillment_orders WHERE id = ${id} LIMIT 1`);
+    const row = pgOne(`SELECT id, arora_order_utr, player_uid, package_name, status FROM fulfillment_orders WHERE id = ${id} LIMIT 1`);
     if (!row) return { status: 404, body: { ok: false, error: 'Order not found' } };
     const next = row.status === 'PAUSED' ? 'QUEUED_EXT' : 'PAUSED';
     pg(`UPDATE fulfillment_orders SET status = ${sqlString(next)} WHERE id = ${id}`);
+    if (row.status !== next) notifyOrderStatus(row, next, '');
     return { status: 200, body: { ok: true, message: next === 'PAUSED' ? 'Order paused.' : 'Order queued for the extension.' } };
   }
   if (action === 'delete') {
@@ -636,25 +711,26 @@ function finishExtensionOrder(body) {
   const reason = String(body.error_message || body.receipt_note || '').slice(0, 500);
   const receipt = String(body.receipt_note || '').slice(0, 500);
   if (!utr) return;
+  const order = pgOne(`SELECT status, arora_order_utr, player_uid, package_code, package_name, quantity, reseller_order_id, account_id, order_price_bdt
+    FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(utr)} LIMIT 1`);
+  if (!order) return;
   if (body.release_voucher && status !== 'COMPLETED') {
     pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
       WHERE used_order_utr = ${sqlString(utr)}`);
     pg(`UPDATE fulfillment_orders SET voucher_ids = NULL, method_used = 'none', status = 'QUEUED_EXT' WHERE arora_order_utr = ${sqlString(utr)}`);
+    if (order.status !== 'QUEUED_EXT') notifyOrderStatus(order, 'QUEUED_EXT', '');
     return;
   }
   const completed = status === 'COMPLETED' ? ', completed_at = CURRENT_TIMESTAMP' : '';
   pg(`UPDATE fulfillment_orders
     SET status = ${sqlString(status)}, status_reason = ${sqlString(reason)}, receipt_note = ${sqlString(receipt)}${completed}
     WHERE arora_order_utr = ${sqlString(utr)}`);
+  if (order.status !== status) notifyOrderStatus(order, status, reason);
   if (status !== 'COMPLETED') return;
-  const order = pgOne(`SELECT arora_order_utr, player_uid, package_code, package_name, quantity, reseller_order_id, account_id, order_price_bdt
-    FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(utr)} LIMIT 1`);
-  if (!order) return;
   if (order.account_id) {
     const pack = pgOne(`SELECT unipin_uc_cost FROM ff_packages WHERE package_code = ${sqlString(order.package_code)} LIMIT 1`) || {};
     pg(`UPDATE unipin_loaded_accounts SET balance = balance - ${num(pack.unipin_uc_cost)} WHERE id = ${Number(order.account_id)}`);
   }
-  notifyTelegram('Order delivered\n' + order.arora_order_utr + '\n' + order.package_name + '\nUID ' + order.player_uid);
   const reseller = resellerRow();
   if (!reseller || !reseller.webhook_url) return;
   const uniqbdOrderId = String(order.reseller_order_id || '').split('#')[0].split(':')[0];
@@ -843,7 +919,7 @@ function dashboard() {
   const balance = pgOne('SELECT COALESCE(SUM(balance), 0) AS n FROM unipin_loaded_accounts') || {};
   const ext = pgOne('SELECT last_seen_at FROM extension_status LIMIT 1') || {};
   const reseller = pgOne(`
-    SELECT extension_key, allowed_ips, telegram_chat_id,
+    SELECT extension_key, allowed_ips, telegram_chat_id, telegram_alerts,
            (telegram_bot_token_encrypted IS NOT NULL AND telegram_bot_token_encrypted LIKE 'aes256gcm$%') AS telegram_has_token,
            (telegram_bot_token_encrypted IS NOT NULL AND telegram_bot_token_encrypted LIKE 'aes256gcm$%'
              AND telegram_chat_id IS NOT NULL AND length(telegram_chat_id) > 0) AS telegram_connected
@@ -896,6 +972,7 @@ function dashboard() {
       telegram_connected: flagOn(reseller.telegram_connected),
       telegram_has_token: flagOn(reseller.telegram_has_token),
       telegram_chat_id: reseller.telegram_chat_id || '',
+      telegram_alerts: telegramAlertMap(reseller.telegram_alerts),
     },
     uniqbd: uniqbdLink(),
   };
@@ -1154,6 +1231,12 @@ const server = http.createServer(async (req, res) => {
   });
   fs.createReadStream(full).pipe(res);
 });
+
+try {
+  ensureTelegramAlertsColumn();
+} catch (err) {
+  console.error('telegram alerts column:', dbError(err));
+}
 
 server.listen(port, host, () => {
   try {
