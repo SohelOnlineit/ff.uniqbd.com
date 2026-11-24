@@ -416,6 +416,45 @@ function claimNextTask() {
   };
 }
 
+function requeueOrder(id) {
+  const row = pgOne(`SELECT id, arora_order_utr, status FROM fulfillment_orders WHERE id = ${id} LIMIT 1`);
+  if (!row) return { status: 404, body: { ok: false, error: 'Order not found' } };
+  if (row.status === 'COMPLETED') return { status: 400, body: { ok: false, error: 'Completed orders stay completed' } };
+  pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
+    WHERE used_order_utr = ${sqlString(row.arora_order_utr)}`);
+  pg(`UPDATE fulfillment_orders
+    SET status = 'QUEUED_EXT', method_used = 'none', account_id = NULL, voucher_ids = NULL, status_reason = ''
+    WHERE id = ${id}`);
+  return { status: 200, body: { ok: true, message: 'Order queued for the extension.' } };
+}
+
+function orderActionResult(id, action, body) {
+  if (action === 'retry') return requeueOrder(id);
+  if (action === 'toggle-pause') {
+    const row = pgOne(`SELECT id, status FROM fulfillment_orders WHERE id = ${id} LIMIT 1`);
+    if (!row) return { status: 404, body: { ok: false, error: 'Order not found' } };
+    const next = row.status === 'PAUSED' ? 'QUEUED_EXT' : 'PAUSED';
+    pg(`UPDATE fulfillment_orders SET status = ${sqlString(next)} WHERE id = ${id}`);
+    return { status: 200, body: { ok: true, message: next === 'PAUSED' ? 'Order paused.' : 'Order queued for the extension.' } };
+  }
+  if (action === 'delete') {
+    const row = pgOne(`SELECT arora_order_utr FROM fulfillment_orders WHERE id = ${id} LIMIT 1`);
+    if (!row) return { status: 404, body: { ok: false, error: 'Order not found' } };
+    pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
+      WHERE used_order_utr = ${sqlString(row.arora_order_utr)}`);
+    pg(`DELETE FROM fulfillment_orders WHERE id = ${id}`);
+    return { status: 200, body: { ok: true } };
+  }
+  const row = pgOne(`SELECT arora_order_utr FROM fulfillment_orders WHERE id = ${id} LIMIT 1`);
+  if (!row) return { status: 404, body: { ok: false, error: 'Order not found' } };
+  finishExtensionOrder({
+    order_utr: row.arora_order_utr,
+    status: 'COMPLETED',
+    receipt_note: String(body.receipt_note || 'Delivered manually').slice(0, 500),
+  });
+  return { status: 200, body: { ok: true } };
+}
+
 function finishExtensionOrder(body) {
   const utr = String(body.order_utr || '').trim().slice(0, 80);
   const allowed = ['COMPLETED', 'PROCESSING', 'PAUSED', 'CANCELLED', 'QUEUED_EXT', 'IN_PROGRESS_EXT'];
@@ -849,6 +888,29 @@ const server = http.createServer(async (req, res) => {
         ok: true,
         vouchers: pgJson('SELECT id, package_code, masked_code, status, used_order_utr FROM unipin_vouchers ORDER BY id DESC'),
       });
+    } catch {
+      return sendJson(res, 500, { ok: false });
+    }
+  }
+
+  if (req.method === 'POST' && pathname === '/admin-api/orders/clear-pending') {
+    if (!readToken(req)) return sendJson(res, 401, { ok: false });
+    try {
+      pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
+        WHERE used_order_utr IN (SELECT arora_order_utr FROM fulfillment_orders WHERE status <> 'COMPLETED')`);
+      pg(`DELETE FROM fulfillment_orders WHERE status <> 'COMPLETED'`);
+      return sendJson(res, 200, { ok: true, message: 'Pending orders cleared.' });
+    } catch {
+      return sendJson(res, 500, { ok: false });
+    }
+  }
+
+  const orderAction = pathname.match(/^\/admin-api\/orders\/(\d+)\/(retry|complete|delete|toggle-pause)$/);
+  if (req.method === 'POST' && orderAction) {
+    if (!readToken(req)) return sendJson(res, 401, { ok: false });
+    try {
+      const result = orderActionResult(Number(orderAction[1]), orderAction[2], JSON.parse(await readBody(req) || '{}'));
+      return sendJson(res, result.status, result.body);
     } catch {
       return sendJson(res, 500, { ok: false });
     }

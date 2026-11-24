@@ -776,6 +776,7 @@
                   <th>Package</th>
                   <th>Method</th>
                   <th>Status</th>
+                  <th>Time</th>
                   <th>Note</th>
                   <th>Action</th>
                 </tr>
@@ -1132,14 +1133,18 @@
         `).join('');
 
       document.getElementById('ordersBody').innerHTML = d.orders.length === 0
-        ? '<tr><td colspan="7" style="color:var(--muted);">No orders yet.</td></tr>'
+        ? '<tr><td colspan="8" style="color:var(--muted);">No orders yet.</td></tr>'
         : d.orders.map((o) => {
+          const noteText = o.receipt_note || o.status_reason || '-';
+          const failed = o.status !== 'COMPLETED' && o.status !== 'QUEUED_EXT' && o.status !== 'IN_PROGRESS_EXT' && o.status !== 'PAUSED' && /error|failed|incorrect/i.test(noteText);
           const stBadge = o.status === 'COMPLETED'
             ? `<span class="pill pill-green">${ICONS.check} Completed</span>`
             : o.status === 'PAUSED'
             ? `<span class="pill pill-red">${ICONS.pause} Paused</span>`
             : o.status === 'QUEUED_EXT' || o.status === 'IN_PROGRESS_EXT'
             ? `<span class="pill pill-blue">${ICONS.clock} Extension Queue</span>`
+            : failed
+            ? `<span class="pill pill-red">Failed</span>`
             : `<span class="pill pill-amber">${ICONS.clock} Processing</span>`;
           const mLabel = o.method_used === 'unipin_voucher'
             ? `<span style="display:inline-flex;align-items:center;gap:5px;">${ICONS.ticket} Token</span>`
@@ -1148,7 +1153,6 @@
             : o.method_used === 'manual'
             ? `<span style="display:inline-flex;align-items:center;gap:5px;">${ICONS.wrench} Manual</span>`
             : `<span style="display:inline-flex;align-items:center;gap:5px;color:var(--muted);">${ICONS.clock} Pending</span>`;
-          const noteText = o.receipt_note || o.status_reason || '-';
           const pauseBtnHtml = o.status === 'PAUSED'
             ? `<button class="btn btn-secondary btn-sm" onclick="togglePauseOrder(${o.id})" title="Resume Order" style="border-color:rgba(0,186,199,0.55);color:#08788c;">${ICONS.play} Resume</button>`
             : `<button class="btn btn-secondary btn-sm" onclick="togglePauseOrder(${o.id})" title="Pause Order" style="border-color:rgba(245,183,55,0.7);color:#fbbf24;">${ICONS.pause} Pause</button>`;
@@ -1159,6 +1163,7 @@
               <td><b>${o.package_name}</b> <code>${o.package_code}</code> ×${o.quantity}</td>
               <td>${mLabel}</td>
               <td>${stBadge}</td>
+              <td style="white-space:nowrap;color:var(--muted);">${whenText(o.created_at)}</td>
               <td style="max-width:210px;overflow:hidden;text-overflow:ellipsis;color:var(--muted);" title="${noteText.replace(/"/g, '&quot;')}">${noteText}</td>
               <td>
                 <div style="display:inline-flex;align-items:center;gap:6px;">
@@ -1414,10 +1419,10 @@
         body: JSON.stringify({}),
       });
       if (r.ok) {
-        toast(r.message || 'Order re-queued for Extension retry!');
+        showToast(r.message || 'Order re-queued for Extension retry!');
         loadDashboard();
       } else {
-        toast(r.error || 'Retry failed.', true);
+        showToast(r.error || 'Retry failed.');
       }
     }
 
