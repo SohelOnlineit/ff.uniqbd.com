@@ -161,6 +161,7 @@
       vertical-align: middle;
     }
     .tok-eye:hover { color: #5eead4; border-color: var(--accent); }
+    .note-eye { flex: 0 0 auto; min-width: 36px; padding: 7px 10px; }
     .w-full { width: 100%; }
 
     /* Topbar */
@@ -921,6 +922,7 @@
                   <th>Method</th>
                   <th>Status</th>
                   <th>Time</th>
+                  <th>Note</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -1502,11 +1504,11 @@
       const query = (document.getElementById('orderSearch') || {}).value || '';
       const rows = deskOrders.filter((order) => orderMatches(order, query));
       if (!deskOrders.length) {
-        body.innerHTML = '<tr><td colspan="7" class="empty-row" style="color:var(--muted);">No orders yet.</td></tr>';
+        body.innerHTML = '<tr><td colspan="8" class="empty-row" style="color:var(--muted);">No orders yet.</td></tr>';
         return;
       }
       if (!rows.length) {
-        body.innerHTML = '<tr><td colspan="7" class="empty-row" style="color:var(--muted);">No order found for this number.</td></tr>';
+        body.innerHTML = '<tr><td colspan="8" class="empty-row" style="color:var(--muted);">No order found for this number.</td></tr>';
         return;
       }
       body.innerHTML = rows.map((o) => {
@@ -1544,9 +1546,9 @@
             <td data-label="Method">${mLabel}</td>
             <td data-label="Status">${stBadge}</td>
             <td data-label="Time" style="color:var(--muted);">${whenText(o.created_at)}</td>
+            <td data-label="Note"><button type="button" class="btn btn-secondary btn-sm note-eye" data-note="${esc(noteText)}" onclick="showOrderNote(this)" title="Show note">${ICONS.eye}</button></td>
             <td data-label="Action">
               <div class="row-actions">
-                <button type="button" class="tok-eye" data-note="${esc(noteText)}" onclick="showOrderNote(this)" title="Show note">${ICONS.eye}</button>
                 ${o.status === 'COMPLETED'
                   ? '<span style="color:#34d399;font-size:12px;margin-right:4px;">Done</span>'
                   : loginFailed
