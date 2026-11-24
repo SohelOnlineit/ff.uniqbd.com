@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AroraShop FF Operator Helper",
-  "version": "1.4.7",
+  "version": "1.4.8",
   "description": "Connects ff.uniqbd.com with Garena Shop & UniPin for operator-assisted Free Fire fulfillment (patient page-load waits, slow-network safe, auto-closes tab & clears Garena and UniPin cookies).",
   "permissions": [
     "storage",
@@ -22,7 +22,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "AroraShop FF Helper v1.4.7",
+    "default_title": "AroraShop FF Helper v1.4.8",
     "default_popup": "popup.html"
   },
   "content_scripts": [

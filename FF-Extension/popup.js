@@ -13,9 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusBox = document.getElementById('statusBox');
 
   function refreshUI() {
-    chrome.storage.local.get(['apiBase', 'extKey', 'autoListen', 'activeTask', 'lastLog'], (res) => {
-      const savedBase = String(res.apiBase || '').trim().replace(/\/+$/, '');
-      apiBaseEl.value = !savedBase || savedBase === 'https://api.arorashop.com' ? 'https://ff.uniqbd.com' : savedBase;
+    chrome.storage.local.get(['extKey', 'autoListen', 'activeTask', 'lastLog'], (res) => {
+      apiBaseEl.value = 'https://ff.uniqbd.com';
       if (res.extKey) extKeyEl.value = res.extKey;
       autoListenEl.checked = Boolean(res.autoListen);
       const text = res.activeTask
@@ -29,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('saveBtn').addEventListener('click', () => {
     chrome.storage.local.set(
       {
-        apiBase: apiBaseEl.value.trim() || 'https://ff.uniqbd.com',
+        apiBase: 'https://ff.uniqbd.com',
         extKey: extKeyEl.value.trim(),
         autoListen: autoListenEl.checked,
         lastLog: 'Connecting to ff.uniqbd.com...',

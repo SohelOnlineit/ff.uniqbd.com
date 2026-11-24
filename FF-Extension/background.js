@@ -1,5 +1,4 @@
 const DEFAULT_API_BASE = 'https://ff.uniqbd.com';
-const OLD_API_BASE = 'https://api.arorashop.com';
 const GARENA_SHOP_URL = 'https://shop.garena.my/?channel=202953';
 
 function shownOrder(task) {
@@ -34,8 +33,8 @@ async function getSettings() {
       ['apiBase', 'extKey', 'autoListen', 'activeTask', 'activeTabId', 'lastLog', 'pendingResult'],
       (res) => {
         const savedBase = String(res.apiBase || '').trim().replace(/\/+$/, '');
-        const apiBase = !savedBase || savedBase === OLD_API_BASE ? DEFAULT_API_BASE : savedBase;
-        if (apiBase !== savedBase) chrome.storage.local.set({ apiBase });
+        const apiBase = DEFAULT_API_BASE;
+        if (savedBase !== apiBase) chrome.storage.local.set({ apiBase });
         resolve({
           apiBase,
           extKey: (res.extKey || '').trim(),
