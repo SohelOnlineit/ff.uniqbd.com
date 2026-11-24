@@ -807,7 +807,8 @@
         color: var(--nav-tone, #26bfb0);
       }
       .tab-btn.active::before { content: none; }
-      .topbar-phone { display: block; padding: 8px 10px; }
+      .topbar-phone { display: block; padding: 4px 12px; }
+      .topbar-phone .topbar-inner { min-height: 40px; gap: 6px; }
       .topbar-phone .topbar-badges { display: none; }
       .topbar-phone .topbar-meta { display: none; }
       .topbar-desk { display: none; }
@@ -829,8 +830,8 @@
         border-radius: 12px;
         min-height: 40px;
       }
-      .round-btn { width: 36px; height: 36px; }
-      .topbar-logo img { height: 32px; }
+      .topbar-phone .round-btn { width: 32px; height: 32px; }
+      .topbar-phone .topbar-logo img { height: 26px; }
       .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .pkg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .token-focus { flex-direction: column; align-items: flex-start; }
@@ -844,7 +845,7 @@
       body { overflow-x: clip; }
       .app-shell { padding: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
       .container { padding: 0; }
-      .topbar-phone { padding: 8px 10px 10px; border-radius: 0; }
+      .topbar-phone { padding: 4px 12px; border-radius: 0; }
       .btn-label-hide { display: none; }
       .tabs { display: flex; flex-direction: column; }
       .tab-btn { width: 100%; font-size: 15px; padding: 6px 8px; }
