@@ -226,6 +226,7 @@
       display: inline-block;
     }
     .topbar-badges { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+    .status-boxes { display: none; }
     .topbar-phone { display: none; }
     .topbar-desk {
       background: rgba(4, 27, 35, 0.92);
@@ -807,7 +808,26 @@
       }
       .tab-btn.active::before { content: none; }
       .topbar-phone { display: block; padding: 8px 10px; }
+      .topbar-phone .topbar-badges { display: none; }
       .topbar-desk { display: none; }
+      .status-boxes {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin: 0 0 12px;
+      }
+      .status-box { margin: 0; min-width: 0; }
+      .status-box .js-uniqbd-badge,
+      .status-box .js-ext-badge {
+        display: flex !important;
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+        white-space: normal;
+        line-height: 1.3;
+        border-radius: 12px;
+        min-height: 40px;
+      }
       .round-btn { width: 36px; height: 36px; }
       .topbar-logo img { height: 32px; }
       .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -831,6 +851,7 @@
       #extLiveBadge { flex: 1 1 100%; }
       .stats-grid { gap: 8px; }
       .stat-card:last-child { grid-column: 1 / -1; }
+      .status-boxes .stat-card { grid-column: auto; }
       .stat-card { padding: 12px; }
       .stat-val { font-size: 20px; }
       .stat-top { font-size: 11px; }
@@ -1088,6 +1109,20 @@
     </header>
     <main class="container">
       <section id="tab-website" class="tab-pane">
+        <section class="status-boxes">
+          <div class="stat-card status-box">
+            <span class="js-uniqbd-badge" style="display:inline-flex;align-items:center;gap:6px;padding:10px 12px;border-radius:12px;font-size:13px;font-weight:700;background:rgba(245,183,55,.16);color:#fbbf24;border:1px solid rgba(245,183,55,.4);">
+              <span style="width:8px;height:8px;border-radius:50%;background:#fbbf24;display:inline-block;flex:0 0 auto;"></span>
+              UniQbd Checking
+            </span>
+          </div>
+          <div class="stat-card status-box">
+            <span class="js-ext-badge" style="display:inline-flex;align-items:center;gap:6px;padding:10px 12px;border-radius:12px;font-size:13px;font-weight:700;background:rgba(244,63,94,.16);color:#fb7185;border:1px solid rgba(244,63,94,.35);">
+              <span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;flex:0 0 auto;"></span>
+              Extension Offline
+            </span>
+          </div>
+        </section>
         <section class="stats-grid">
           <div class="stat-card">
             <div class="stat-top">
