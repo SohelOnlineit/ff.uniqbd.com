@@ -798,6 +798,37 @@ function readShopOrderNumber(body) {
   return /^[A-Za-z0-9-]{1,32}$/.test(raw) ? raw : '';
 }
 
+const SHOP_STOP_REASON = 'Stopped because this order is not paid on uniqbd.com.';
+
+function stopResellerOrder(reseller, body) {
+  const orderId = String(body.order_id || '').trim().slice(0, 80);
+  if (!orderId) return { status: 400, body: { ok: false, error: 'order_id is required' } };
+  let rows = [];
+  try {
+    rows = pgJson(`SELECT id, arora_order_utr, shop_order_number, player_uid, package_name, status
+      FROM fulfillment_orders
+      WHERE reseller_id = ${Number(reseller.id)} AND reseller_order_id = ${sqlString(orderId)}`);
+  } catch (err) {
+    console.error('stop order:', dbError(err));
+    return { status: 500, body: { ok: false } };
+  }
+  rows.forEach((row) => {
+    if (row.status === 'COMPLETED' || row.status === 'CANCELLED') return;
+    try {
+      pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
+        WHERE used_order_utr = ${sqlString(row.arora_order_utr)}`);
+    } catch (err) {
+      console.error('stop order voucher:', dbError(err));
+    }
+    pg(`UPDATE fulfillment_orders
+      SET status = 'CANCELLED', status_reason = ${sqlString(SHOP_STOP_REASON)},
+          method_used = 'none', voucher_ids = NULL, account_id = NULL
+      WHERE id = ${Number(row.id)} AND status <> 'COMPLETED' AND status <> 'CANCELLED'`);
+    notifyOrderStatus(row, 'CANCELLED', SHOP_STOP_REASON);
+  });
+  return { status: 200, body: { ok: true } };
+}
+
 function placeResellerOrder(reseller, body, ip) {
   const orderId = String(body.order_id || '').trim().slice(0, 80);
   const shopOrderNumber = readShopOrderNumber(body);
@@ -816,7 +847,7 @@ function placeResellerOrder(reseller, body, ip) {
     const resellerOrderId = quantity === 1 ? orderId : orderId + '#' + index;
     let existing = null;
     try {
-      existing = pgOne(`SELECT id, arora_order_utr, shop_order_number, reseller_order_id, status, package_code, package_name
+      existing = pgOne(`SELECT id, arora_order_utr, shop_order_number, reseller_order_id, status, status_reason, package_code, package_name
         FROM fulfillment_orders
         WHERE reseller_id = ${Number(reseller.id)} AND reseller_order_id = ${sqlString(resellerOrderId)}
         LIMIT 1`);
@@ -828,6 +859,14 @@ function placeResellerOrder(reseller, body, ip) {
         LIMIT 1`);
     }
     if (existing) {
+      if (existing.status === 'CANCELLED' && existing.status_reason === SHOP_STOP_REASON) {
+        pg(`UPDATE fulfillment_orders
+          SET status = 'QUEUED_EXT', method_used = 'none', account_id = NULL, voucher_ids = NULL,
+              status_reason = '', receipt_note = '', delivery_attempts = 0
+          WHERE id = ${Number(existing.id)} AND status = 'CANCELLED'`);
+        existing.status = 'QUEUED_EXT';
+        notifyOrderStatus(existing, 'QUEUED_EXT', '');
+      }
       if (shopOrderNumber && !String(existing.shop_order_number || '').trim()) {
         try {
           pg(`UPDATE fulfillment_orders SET shop_order_number = ${sqlString(shopOrderNumber)} WHERE id = ${Number(existing.id)}`);
@@ -1171,8 +1210,8 @@ function finishExtensionOrder(body) {
       FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(utr)} LIMIT 1`);
   }
   if (!order || order.status === 'COMPLETED') return;
+  if (order.status !== 'IN_PROGRESS_EXT' && order.status !== 'PROCESSING') return;
   if (status !== 'COMPLETED') {
-    if (order.status !== 'IN_PROGRESS_EXT' && order.status !== 'PROCESSING') return;
     const loginFailed = status === 'LOGIN_FAILED' || loginFailureText(reason);
     cancelUndeliveredOrder(order, reason, receipt, loginFailed ? 'LOGIN_FAILED' : 'CANCELLED');
     return;
@@ -1521,9 +1560,10 @@ try {
 
 const server = http.createServer(async (req, res) => {
   let pathname = '/';
+  let requestUrl = null;
   try {
-    const url = new URL(req.url, 'http://127.0.0.1');
-    pathname = decodeURIComponent(url.pathname);
+    requestUrl = new URL(req.url, 'http://127.0.0.1');
+    pathname = decodeURIComponent(requestUrl.pathname);
   } catch {
     return send(res, 400, 'Bad request', 'text/plain; charset=utf-8');
   }
@@ -1653,6 +1693,20 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if (pathname === '/ext-api/order-open' && req.method === 'GET') {
+    try {
+      if (!extensionMatches(req)) return sendJson(res, 401, { ok: false, error: 'Invalid extension key' });
+      const utr = String(requestUrl.searchParams.get('utr') || '').trim().slice(0, 80);
+      if (!utr) return sendJson(res, 400, { ok: false });
+      const row = pgOne(`SELECT status FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(utr)} LIMIT 1`);
+      const open = Boolean(row) && (row.status === 'QUEUED_EXT' || row.status === 'IN_PROGRESS_EXT' || row.status === 'PROCESSING');
+      return sendJson(res, 200, { ok: true, open });
+    } catch (err) {
+      console.error('order open failed:', dbError(err));
+      return sendJson(res, 500, { ok: false, error: 'Extension API failed' });
+    }
+  }
+
   if (pathname === '/ext-api/next-order' && req.method === 'GET') {
     try {
       if (!extensionMatches(req)) return sendJson(res, 401, { ok: false, error: 'Invalid extension key' });
@@ -1673,6 +1727,18 @@ const server = http.createServer(async (req, res) => {
     } catch (err) {
       console.error('extension result failed:', dbError(err));
       return sendJson(res, 500, { ok: false, error: 'Extension API failed' });
+    }
+  }
+
+  if (pathname === '/api/reseller/v1/order/cancel' && req.method === 'POST') {
+    try {
+      const reseller = resellerAuth(req);
+      if (!reseller) return sendJson(res, 401, { ok: false, error: 'Invalid API key' });
+      const result = stopResellerOrder(reseller, JSON.parse(await readBody(req) || '{}'));
+      return sendJson(res, result.status, result.body);
+    } catch (err) {
+      console.error('reseller cancel failed:', dbError(err));
+      return sendJson(res, 500, { ok: false, error: 'Order API failed' });
     }
   }
 

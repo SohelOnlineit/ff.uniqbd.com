@@ -131,6 +131,21 @@ async function closeFulfillmentTab(tabId) {
   } catch (_) {}
 }
 
+async function orderStillOpen(st, utr) {
+  try {
+    const res = await fetch(`${st.apiBase}/ext-api/order-open?utr=${encodeURIComponent(utr)}`, {
+      method: 'GET',
+      headers: { 'X-Extension-Key': st.extKey },
+    });
+    if (res.status === 404) return true;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok === false) return true;
+    return data.open !== false;
+  } catch (_) {
+    return true;
+  }
+}
+
 async function pingDesk(st) {
   if (!st.extKey) return { ok: false, error: 'Extension key is not saved' };
   try {
@@ -172,6 +187,20 @@ async function pollNextOrderNow(force = false) {
     st.pendingResult = null;
     st.activeTask = null;
     st.activeTabId = null;
+  }
+
+  if (st.activeTask && st.activeTask.order_utr && (await orderStillOpen(st, st.activeTask.order_utr)) === false) {
+    const stopped = shownOrder(st.activeTask);
+    const tabId = st.activeTabId;
+    await chrome.storage.local.set({
+      activeTask: null,
+      activeTabId: null,
+      pendingResult: null,
+      lastLog: `Stopped ${stopped}. This order is not paid.`,
+    });
+    await closeDeliveryTabs(null);
+    if (tabId) await closeFulfillmentTab(tabId);
+    return { ok: true, stopped: true };
   }
 
   // A task with no start time, or one that has already run too long, must not block the next order.
