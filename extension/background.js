@@ -2,8 +2,16 @@ const DEFAULT_API_BASE = 'https://ff.uniqbd.com';
 const OLD_API_BASE = 'https://api.arorashop.com';
 const GARENA_SHOP_URL = 'https://shop.garena.my/?channel=202953';
 
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.alarms.create('aroraPollOrders', { periodInMinutes: 0.1 }); // every 6 seconds
+function ensurePollAlarm() {
+  chrome.alarms.create('aroraPollOrders', { periodInMinutes: 0.1 });
+}
+
+ensurePollAlarm();
+pollNextOrder(false);
+chrome.runtime.onInstalled.addListener(ensurePollAlarm);
+chrome.runtime.onStartup.addListener(() => {
+  ensurePollAlarm();
+  pollNextOrder(false);
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -93,9 +101,26 @@ async function closeFulfillmentTab(tabId) {
   } catch (_) {}
 }
 
+async function pingDesk(st) {
+  if (!st.extKey) return;
+  try {
+    await fetch(`${st.apiBase}/ext-api/ping`, {
+      method: 'GET',
+      headers: { 'X-Extension-Key': st.extKey },
+    });
+  } catch (_) {}
+}
+
 async function pollNextOrder(force = false) {
   const st = await getSettings();
   if (!st.extKey) return { ok: false, error: 'Extension Key not set.' };
+  await pingDesk(st);
+
+  // A task with no start time, or one that has already run too long, must not block the next order.
+  if (st.activeTask && !st.activeTask.startedAt) {
+    await chrome.storage.local.set({ activeTask: null, activeTabId: null, lastLog: 'Cleared a stuck task' });
+    st.activeTask = null;
+  }
 
   // Patient global fail-safe timeout: 150s normal, up to 240s if the active tab is still actively loading over a slow network
   if (st.activeTask && st.activeTask.startedAt) {

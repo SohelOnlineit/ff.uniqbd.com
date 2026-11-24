@@ -1230,6 +1230,17 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if (pathname === '/ext-api/ping' && req.method === 'GET') {
+    try {
+      if (!extensionMatches(req)) return sendJson(res, 401, { ok: false, error: 'Invalid extension key' });
+      touchExtension(clientIp(req));
+      return sendJson(res, 200, { ok: true });
+    } catch (err) {
+      console.error('extension ping failed:', dbError(err));
+      return sendJson(res, 500, { ok: false, error: 'Extension API failed' });
+    }
+  }
+
   if (pathname === '/ext-api/next-order' && req.method === 'GET') {
     try {
       if (!extensionMatches(req)) return sendJson(res, 401, { ok: false, error: 'Invalid extension key' });
