@@ -988,12 +988,9 @@
           <img src="/logo.webp" alt="FF.UniQbd" />
         </a>
         <div class="topbar-right">
-          <a class="round-btn" href="/admin" title="Admin" aria-label="Admin">
-            <svg class="ico" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          </a>
           <div class="head-menu" id="headMenu">
-            <button type="button" class="round-btn head-dots" id="headDots" aria-label="More" aria-haspopup="menu" aria-expanded="false">
-              <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+            <button type="button" class="round-btn" id="headProfile" title="Account" aria-label="Account" aria-haspopup="menu" aria-expanded="false">
+              <svg class="ico" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             </button>
             <div class="head-pop" id="headPop" role="menu" hidden>
               <a class="head-item" href="/docs" target="_blank" role="menuitem">
@@ -1704,13 +1701,13 @@
 
     function setHeadMenu(open) {
       const pop = document.getElementById('headPop');
-      const btn = document.getElementById('headDots');
+      const btn = document.getElementById('headProfile');
       if (!pop || !btn) return;
       pop.hidden = !open;
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
 
-    document.getElementById('headDots').addEventListener('click', (event) => {
+    document.getElementById('headProfile').addEventListener('click', (event) => {
       event.stopPropagation();
       setHeadMenu(document.getElementById('headPop').hidden);
     });
