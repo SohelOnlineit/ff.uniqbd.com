@@ -747,6 +747,15 @@
 
       <!-- TAB 2: TOKENS -->
       <section id="tab-vouchers" class="tab-pane hidden">
+        <section class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-top">
+              <span>Account Balance (UP)</span>
+              <svg class="ico ico-sm c-green" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            </div>
+            <div class="stat-val c-green js-bal">0</div>
+          </div>
+        </section>
         <div class="pkg-pick">
           <div class="pkg-pick-label">Select package</div>
           <div class="pkg-grid" id="pkgCards"></div>
@@ -808,7 +817,7 @@
               <span>Account Balance (UP)</span>
               <svg class="ico ico-sm c-green" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
             </div>
-            <div class="stat-val c-green" id="stBal">0</div>
+            <div class="stat-val c-green js-bal" id="stBal">0</div>
           </div>
         </section>
         <div class="grid-2">
@@ -1098,7 +1107,9 @@
       document.getElementById('stTotal').textContent = d.stats.total_orders;
       document.getElementById('stDone').textContent = d.stats.completed_orders;
       document.getElementById('stProc').textContent = d.stats.processing_orders;
-      document.getElementById('stBal').textContent = d.stats.total_account_balance;
+      document.querySelectorAll('.js-bal').forEach((el) => {
+        el.textContent = d.stats.total_account_balance;
+      });
 
       const pkgSelect = document.getElementById('vPkgCode');
       const keepPkg = pkgSelect.value;
