@@ -354,6 +354,7 @@
       font-weight: 700;
     }
     .card-sub { font-size: 12px; color: var(--muted); }
+    .list-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
     /* Tables */
@@ -375,6 +376,13 @@
       letter-spacing: 0.04em;
     }
     tbody tr:last-child td { border-bottom: none; }
+    .note-cell {
+      max-width: 210px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--muted);
+    }
+    .row-actions { display: inline-flex; align-items: center; gap: 6px; }
     code {
       background: rgba(0, 186, 199, 0.1);
       padding: 2px 6px;
@@ -656,6 +664,86 @@
         bottom: calc(14px + env(safe-area-inset-bottom));
         max-width: none;
       }
+      .list-tools { width: 100%; }
+      .list-tools .order-search { width: 100%; }
+      .orders-table,
+      .tokens-table { overflow: visible; }
+      .orders-table table,
+      .tokens-table table,
+      .orders-table thead,
+      .tokens-table thead,
+      .orders-table tbody,
+      .tokens-table tbody,
+      .orders-table tr,
+      .tokens-table tr,
+      .orders-table td,
+      .tokens-table td { display: block; width: 100%; }
+      .orders-table thead,
+      .tokens-table thead { display: none; }
+      .orders-table tr,
+      .tokens-table tr {
+        margin-bottom: 10px;
+        padding: 4px 12px;
+        border: 1px solid rgba(38, 191, 176, 0.28);
+        border-radius: 14px;
+        background: #02141b;
+      }
+      .orders-table td,
+      .tokens-table td {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 0;
+        white-space: normal;
+        text-align: right;
+        border-bottom: 1px solid var(--border);
+      }
+      .orders-table tbody tr:last-child td,
+      .tokens-table tbody tr:last-child td { border-bottom: 1px solid var(--border); }
+      .orders-table tr td:last-child,
+      .tokens-table tr td:last-child { border-bottom: none; }
+      .orders-table code,
+      .tokens-table code { white-space: normal; word-break: break-all; }
+      .orders-table .cell-val,
+      .tokens-table .cell-val { min-width: 0; text-align: right; }
+      .tokens-table td[data-label="Token"] .cell-val {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .orders-table td::before,
+      .tokens-table td::before {
+        content: attr(data-label);
+        flex: 0 0 76px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-align: left;
+        text-transform: uppercase;
+      }
+      .orders-table td.empty-row,
+      .tokens-table td.empty-row {
+        display: block;
+        text-align: center;
+        border-bottom: none;
+      }
+      .orders-table td.empty-row::before,
+      .tokens-table td.empty-row::before { content: none; }
+      .orders-table .note-cell {
+        max-width: none;
+        overflow: visible;
+        text-overflow: unset;
+      }
+      .orders-table td[data-label="Action"] > .row-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 6px;
+      }
     }
   </style>
 </head>
@@ -825,7 +913,7 @@
               <svg class="ico" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
               Recent Orders
             </div>
-            <div style="display:flex;align-items:center;gap:10px;">
+            <div class="list-tools">
               <input id="orderSearch" class="order-search" type="search" placeholder="Order number" oninput="renderOrders()" />
               <span class="card-sub">Auto & Manual Queue</span>
               <button type="button" class="btn btn-danger btn-sm" onclick="clearPendingOrders()" title="Delete all non-completed orders">
@@ -834,7 +922,7 @@
               </button>
             </div>
           </div>
-          <div class="table-wrap">
+          <div class="table-wrap orders-table">
             <table>
               <thead>
                 <tr>
@@ -901,7 +989,7 @@
             </div>
             <span class="card-sub">Masked for security</span>
           </div>
-          <div class="table-wrap">
+          <div class="table-wrap tokens-table">
             <table>
               <thead>
                 <tr>
@@ -1425,11 +1513,11 @@
       const query = (document.getElementById('orderSearch') || {}).value || '';
       const rows = deskOrders.filter((order) => orderMatches(order, query));
       if (!deskOrders.length) {
-        body.innerHTML = '<tr><td colspan="8" style="color:var(--muted);">No orders yet.</td></tr>';
+        body.innerHTML = '<tr><td colspan="8" class="empty-row" style="color:var(--muted);">No orders yet.</td></tr>';
         return;
       }
       if (!rows.length) {
-        body.innerHTML = '<tr><td colspan="8" style="color:var(--muted);">No order found for this number.</td></tr>';
+        body.innerHTML = '<tr><td colspan="8" class="empty-row" style="color:var(--muted);">No order found for this number.</td></tr>';
         return;
       }
       body.innerHTML = rows.map((o) => {
@@ -1461,15 +1549,15 @@
           : `<button class="btn btn-secondary btn-sm" onclick="togglePauseOrder(${Number(o.id)})" title="Pause Order" style="border-color:rgba(245,183,55,0.7);color:#fbbf24;">${ICONS.pause} Pause</button>`;
         return `
           <tr>
-            <td><code>${esc(orderIdText(o))}</code></td>
-            <td><code>${esc(o.player_uid)}</code></td>
-            <td><b>${esc(o.package_name)}</b> <code>${esc(o.package_code)}</code> ×${Number(o.quantity) || 0}</td>
-            <td>${mLabel}</td>
-            <td>${stBadge}</td>
-            <td style="white-space:nowrap;color:var(--muted);">${whenText(o.created_at)}</td>
-            <td style="max-width:210px;overflow:hidden;text-overflow:ellipsis;color:var(--muted);" title="${esc(noteText)}">${esc(noteText)}</td>
-            <td>
-              <div style="display:inline-flex;align-items:center;gap:6px;">
+            <td data-label="Order"><code>${esc(orderIdText(o))}</code></td>
+            <td data-label="UID"><code>${esc(o.player_uid)}</code></td>
+            <td data-label="Package"><span class="cell-val"><b>${esc(o.package_name)}</b> <code>${esc(o.package_code)}</code> ×${Number(o.quantity) || 0}</span></td>
+            <td data-label="Method">${mLabel}</td>
+            <td data-label="Status">${stBadge}</td>
+            <td data-label="Time" style="color:var(--muted);">${whenText(o.created_at)}</td>
+            <td class="note-cell" data-label="Note" title="${esc(noteText)}">${esc(noteText)}</td>
+            <td data-label="Action">
+              <div class="row-actions">
                 ${o.status === 'COMPLETED'
                   ? '<span style="color:#34d399;font-size:12px;margin-right:4px;">Done</span>'
                   : loginFailed
@@ -1664,14 +1752,14 @@
       const r = await api('/admin-api/vouchers');
       if (!r.ok) return;
       document.getElementById('vouchersListBody').innerHTML = r.vouchers.length === 0
-        ? '<tr><td colspan="5" style="color:var(--muted);">No tokens in stock.</td></tr>'
+        ? '<tr><td colspan="5" class="empty-row" style="color:var(--muted);">No tokens in stock.</td></tr>'
         : r.vouchers.map((v) => `
           <tr>
-            <td><code>${esc(v.package_code)}</code></td>
-            <td><code id="tok-${Number(v.id)}">${esc(v.masked_code)}</code><button type="button" class="tok-eye" onclick="toggleToken(${Number(v.id)}, this)" title="Show token">${ICONS.eye}</button></td>
-            <td><span class="pill ${v.status === 'available' ? 'pill-green' : 'pill-blue'}">${v.status === 'available' ? 'Available' : 'Used'}</span></td>
-            <td>${v.used_order_utr || v.shop_order_number ? `<code>${esc(orderIdText(v))}</code>` : '-'}</td>
-            <td>${v.status === 'available' ? `<button class="btn btn-danger btn-sm" onclick="delVoucher(${Number(v.id)})">${ICONS.trash}</button>` : '-'}</td>
+            <td data-label="Code"><code>${esc(v.package_code)}</code></td>
+            <td data-label="Token"><span class="cell-val"><code id="tok-${Number(v.id)}">${esc(v.masked_code)}</code><button type="button" class="tok-eye" onclick="toggleToken(${Number(v.id)}, this)" title="Show token">${ICONS.eye}</button></span></td>
+            <td data-label="Status"><span class="pill ${v.status === 'available' ? 'pill-green' : 'pill-blue'}">${v.status === 'available' ? 'Available' : 'Used'}</span></td>
+            <td data-label="Order">${v.used_order_utr || v.shop_order_number ? `<code>${esc(orderIdText(v))}</code>` : '-'}</td>
+            <td data-label="Action">${v.status === 'available' ? `<button class="btn btn-danger btn-sm" onclick="delVoucher(${Number(v.id)})">${ICONS.trash}</button>` : '-'}</td>
           </tr>
         `).join('');
     }
