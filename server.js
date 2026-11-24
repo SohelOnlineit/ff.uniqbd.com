@@ -287,9 +287,101 @@ function num(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+const DEFAULT_ALLOWED_IPS = [
+  '103.114.38.186',
+  '103.114.38.210',
+  '103.114.38.211',
+  '103.114.38.212',
+  '103.114.38.213',
+  '103.114.38.214',
+  '103.114.38.215',
+  '103.114.38.216',
+  '103.114.38.217',
+  '103.114.38.218',
+  '103.114.38.219',
+  '103.114.38.220',
+  '103.114.38.221',
+  '103.114.38.222',
+];
+
+function normalizeIp(value) {
+  let ip = String(value || '').trim();
+  if (ip.startsWith('::ffff:')) ip = ip.slice(7);
+  return ip;
+}
+
+function isLoopback(ip) {
+  return ip === '127.0.0.1' || ip === '::1';
+}
+
+function validIpv4(ip) {
+  const parts = String(ip || '').split('.');
+  if (parts.length !== 4) return false;
+  return parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) <= 255 && String(Number(part)) === part);
+}
+
 function clientIp(req) {
-  const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-  return (fwd || req.socket.remoteAddress || '').slice(0, 80);
+  const peer = normalizeIp(req.socket && req.socket.remoteAddress);
+  if (isLoopback(peer)) {
+    const real = normalizeIp(req.headers['x-real-ip'] || '');
+    if (validIpv4(real) || isLoopback(real)) return real.slice(0, 80);
+    const forwarded = String(req.headers['x-forwarded-for'] || '')
+      .split(',')
+      .map((item) => normalizeIp(item))
+      .filter((item) => validIpv4(item) || isLoopback(item));
+    if (forwarded.length) return forwarded[forwarded.length - 1].slice(0, 80);
+  }
+  return peer.slice(0, 80);
+}
+
+function ensureIpWhitelist() {
+  pg(`CREATE TABLE IF NOT EXISTS ip_whitelist (
+    id SERIAL PRIMARY KEY,
+    ip TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+  const count = pgOne('SELECT COUNT(*)::int AS n FROM ip_whitelist') || {};
+  if (num(count.n) > 0) return;
+  for (const ip of DEFAULT_ALLOWED_IPS) {
+    pg(`INSERT INTO ip_whitelist (ip) VALUES (${sqlString(ip)}) ON CONFLICT (ip) DO NOTHING`);
+  }
+}
+
+function ipAllowed(req) {
+  const ip = clientIp(req);
+  if (isLoopback(ip)) return true;
+  try {
+    return Boolean(pgOne(`SELECT id FROM ip_whitelist WHERE ip = ${sqlString(ip)} LIMIT 1`));
+  } catch (err) {
+    console.error('ip check:', dbError(err));
+    return false;
+  }
+}
+
+function listWhitelist(currentIp) {
+  const ips = pgJson('SELECT id, ip FROM ip_whitelist ORDER BY id');
+  return { ok: true, current_ip: currentIp, ips };
+}
+
+function addWhitelistIp(ip) {
+  const clean = normalizeIp(ip);
+  if (!validIpv4(clean) || isLoopback(clean)) return { ok: false, error: 'Enter a valid IP address.' };
+  const count = pgOne('SELECT COUNT(*)::int AS n FROM ip_whitelist') || {};
+  if (num(count.n) >= 100) return { ok: false, error: 'The whitelist is full.' };
+  const existing = pgOne(`SELECT id FROM ip_whitelist WHERE ip = ${sqlString(clean)} LIMIT 1`);
+  if (existing) return { ok: false, error: 'This IP is already on the list.' };
+  pg(`INSERT INTO ip_whitelist (ip) VALUES (${sqlString(clean)})`);
+  return { ok: true };
+}
+
+function removeWhitelistIp(id, currentIp) {
+  const row = pgOne(`SELECT id, ip FROM ip_whitelist WHERE id = ${Number(id)} LIMIT 1`);
+  if (!row) return { ok: false, error: 'IP not found.' };
+  if (row.ip === currentIp) return { ok: false, error: 'You are using this IP. It stays on the list.' };
+  const count = pgOne('SELECT COUNT(*)::int AS n FROM ip_whitelist') || {};
+  if (num(count.n) <= 1) return { ok: false, error: 'Keep at least one IP on the list.' };
+  pg(`DELETE FROM ip_whitelist WHERE id = ${Number(id)}`);
+  return { ok: true };
 }
 
 function extensionMatches(req) {
@@ -422,6 +514,11 @@ function ensureDeskColumns() {
       is_active INTEGER
     )`,
   ];
+  try {
+    ensureIpWhitelist();
+  } catch (err) {
+    console.error('ip whitelist:', dbError(err));
+  }
   for (const sql of statements) {
     try {
       pg(sql);
@@ -1352,6 +1449,10 @@ const server = http.createServer(async (req, res) => {
   let pathname = decodeURIComponent(url.pathname);
   if (pathname.length > 1 && pathname.endsWith('/')) pathname = pathname.slice(0, -1);
 
+  if (!ipAllowed(req)) {
+    return send(res, 403, 'This IP is not allowed.', 'text/plain; charset=utf-8');
+  }
+
   if (pathname === '/health') {
     return sendJson(res, 200, { ok: true, host: 'ff.uniqbd.com' });
   }
@@ -1563,6 +1664,39 @@ const server = http.createServer(async (req, res) => {
       pg(`DELETE FROM fulfillment_orders WHERE status <> 'COMPLETED'`);
       return sendJson(res, 200, { ok: true, message: 'Pending orders cleared.' });
     } catch {
+      return sendJson(res, 500, { ok: false });
+    }
+  }
+
+  if (pathname === '/admin-api/ip-whitelist' && req.method === 'GET') {
+    if (!readToken(req)) return sendJson(res, 401, { ok: false });
+    try {
+      return sendJson(res, 200, listWhitelist(clientIp(req)));
+    } catch (err) {
+      console.error('ip list failed:', dbError(err));
+      return sendJson(res, 500, { ok: false });
+    }
+  }
+
+  if (pathname === '/admin-api/ip-whitelist' && req.method === 'POST') {
+    if (!readToken(req)) return sendJson(res, 401, { ok: false });
+    try {
+      const result = addWhitelistIp(JSON.parse(await readBody(req) || '{}').ip);
+      return sendJson(res, result.ok ? 200 : 400, result.ok ? listWhitelist(clientIp(req)) : result);
+    } catch (err) {
+      console.error('ip add failed:', dbError(err));
+      return sendJson(res, 500, { ok: false });
+    }
+  }
+
+  const ipRemove = pathname.match(/^\/admin-api\/ip-whitelist\/(\d+)$/);
+  if (ipRemove && req.method === 'DELETE') {
+    if (!readToken(req)) return sendJson(res, 401, { ok: false });
+    try {
+      const result = removeWhitelistIp(Number(ipRemove[1]), clientIp(req));
+      return sendJson(res, result.ok ? 200 : 400, result.ok ? listWhitelist(clientIp(req)) : result);
+    } catch (err) {
+      console.error('ip remove failed:', dbError(err));
       return sendJson(res, 500, { ok: false });
     }
   }

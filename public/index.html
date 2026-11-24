@@ -1032,6 +1032,10 @@
               <span class="set-ico" aria-hidden="true"><svg class="ico ico-lg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span>
               <span><strong>Connection</strong><em>Website, shop, webhook, and extension.</em></span>
             </button>
+            <button type="button" class="set-card" onclick="openSetting('ips')">
+              <span class="set-ico" aria-hidden="true"><svg class="ico ico-lg" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+              <span><strong>IP whitelist</strong><em>Only these IPs can open the website.</em></span>
+            </button>
           </div>
         </div>
         <div id="setConnection" class="set-panel hidden">
@@ -1063,6 +1067,28 @@
               <button type="button" class="btn btn-secondary btn-sm" onclick="copyExtKey('setExtKey')">Copy Key</button>
               <a href="/arorashop-ff-extension.zip" download class="btn btn-primary btn-sm" style="text-decoration:none;">Download</a>
             </div>
+          </div>
+        </div>
+        <div id="setIps" class="set-panel hidden">
+          <button type="button" class="btn btn-secondary btn-sm set-back" onclick="openSetting('')">← General</button>
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">
+                <svg class="ico" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                IP whitelist
+              </div>
+              <span class="card-sub">Your IP <b id="myIp">—</b></span>
+            </div>
+            <p style="color:var(--muted);font-size:13px;margin-bottom:12px;">Anyone outside this list gets “This IP is not allowed.” The extension and uniqbd.com orders must also come from a listed IP. The IP you are using now cannot be removed.</p>
+            <form id="ipForm" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px;">
+              <div class="field" style="flex:1;min-width:180px;margin:0;">
+                <label for="ipNew">Add an IP</label>
+                <input type="text" id="ipNew" inputmode="decimal" autocomplete="off" placeholder="103.114.38.186" maxlength="15" />
+              </div>
+              <button type="submit" class="btn btn-primary">Add IP</button>
+            </form>
+            <p id="ipErr" style="color:#fb7185;font-size:12px;margin:0 0 10px;"></p>
+            <div id="ipList"></div>
           </div>
         </div>
         <div id="setSecurity" class="set-panel hidden">
@@ -1183,11 +1209,40 @@
       const security = document.getElementById('setSecurity');
       const telegram = document.getElementById('setTelegram');
       const connection = document.getElementById('setConnection');
-      if (!home || !security || !telegram || !connection) return;
+      const ips = document.getElementById('setIps');
+      if (!home || !security || !telegram || !connection || !ips) return;
       home.classList.toggle('hidden', Boolean(name));
       security.classList.toggle('hidden', name !== 'security');
       telegram.classList.toggle('hidden', name !== 'telegram');
       connection.classList.toggle('hidden', name !== 'connection');
+      ips.classList.toggle('hidden', name !== 'ips');
+      if (name === 'ips') loadIpWhitelist();
+    }
+
+    function renderIpWhitelist(data) {
+      const mine = document.getElementById('myIp');
+      const list = document.getElementById('ipList');
+      if (mine) mine.textContent = data.current_ip || '—';
+      if (!list) return;
+      const ips = Array.isArray(data.ips) ? data.ips : [];
+      list.innerHTML = ips.map((row) => {
+        const current = row.ip === data.current_ip;
+        return `<div class="key-row" style="margin-bottom:8px;">
+          <input type="text" readonly value="${esc(row.ip)}" style="font-family:monospace;font-size:12px;" />
+          ${current ? '<span class="pill pill-green">This IP</span>' : `<button type="button" class="btn btn-danger btn-sm" data-ip-id="${Number(row.id)}">Remove</button>`}
+        </div>`;
+      }).join('');
+    }
+
+    async function loadIpWhitelist() {
+      const err = document.getElementById('ipErr');
+      const data = await api('/admin-api/ip-whitelist');
+      if (!data.ok) {
+        if (err) err.textContent = data.error || 'Could not load the IP list.';
+        return;
+      }
+      if (err) err.textContent = '';
+      renderIpWhitelist(data);
     }
 
     function switchTab(name, btn) {
@@ -1281,6 +1336,41 @@
         document.getElementById('loginView').classList.remove('hidden');
       }
     }
+
+    document.getElementById('ipForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('ipErr');
+      if (err) err.textContent = '';
+      const data = await api('/admin-api/ip-whitelist', {
+        method: 'POST',
+        body: JSON.stringify({ ip: document.getElementById('ipNew').value.trim() }),
+      });
+      if (!data.ok) {
+        if (err) err.textContent = data.error || 'Could not add this IP.';
+        return;
+      }
+      document.getElementById('ipNew').value = '';
+      renderIpWhitelist(data);
+      showToast('IP added.');
+    });
+
+    document.getElementById('ipList').addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-ip-id]');
+      if (!btn) return;
+      const ip = btn.parentElement.querySelector('input');
+      const label = ip ? ip.value : 'this IP';
+      const yes = await askConfirm('Remove this IP?', label + ' will no longer be able to open the website.', 'Remove');
+      if (!yes) return;
+      const err = document.getElementById('ipErr');
+      const data = await api('/admin-api/ip-whitelist/' + btn.dataset.ipId, { method: 'DELETE' });
+      if (!data.ok) {
+        if (err) err.textContent = data.error || 'Could not remove this IP.';
+        return;
+      }
+      if (err) err.textContent = '';
+      renderIpWhitelist(data);
+      showToast('IP removed.');
+    });
 
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
