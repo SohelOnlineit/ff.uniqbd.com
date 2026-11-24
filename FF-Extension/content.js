@@ -15,6 +15,8 @@
   let lastActionAt = 0;
   let pageLoadedAt = document.readyState === 'complete' ? Date.now() : 0;
   const reportedUtrs = new Set();
+  let loginAttemptKey = '';
+  let loginClickedAt = 0;
 
   window.addEventListener('load', () => {
     if (!pageLoadedAt) pageLoadedAt = Date.now();
@@ -236,7 +238,7 @@
 
     bar.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <strong style="color:#15b48b;font-size:13px;">AroraShop Helper v1.4.5</strong>
+        <strong style="color:#15b48b;font-size:13px;">AroraShop Helper v1.4.6</strong>
         <span style="background:rgba(21,180,139,0.16);color:#34d399;padding:2px 7px;border-radius:99px;font-size:11px;font-weight:600;">${task.order_utr}</span>
       </div>
       <div style="color:#cbd5e1;margin-bottom:4px;">UID: <b>${task.player_uid}</b> &bull; <b>${task.denom_label}</b></div>
@@ -497,8 +499,14 @@
             return;
           }
 
+          const attemptKey = `${task.order_utr}:${task.startedAt || 0}`;
+          if (attemptKey !== loginAttemptKey) {
+            loginAttemptKey = attemptKey;
+            loginClickedAt = 0;
+          }
+          const loginChecked = loginClickedAt && Date.now() - loginClickedAt >= 5000;
           const bodyTxt = document.body?.innerText || '';
-          if (/invalid player|player id not found|player not found|account not found|does not exist|incorrect player|wrong player|not a valid|check your (player )?id/i.test(bodyTxt)) {
+          if (loginChecked && /invalid player|player id not found|player not found|account not found|does not exist|incorrect player|wrong player|not a valid|check your (player )?id/i.test(bodyTxt)) {
             renderFloatingBar(task, 'Login Failed', true);
             reportOnce(task, {
               orderUtr: task.order_utr,
@@ -512,7 +520,7 @@
 
           const uidInput = document.querySelector('input[placeholder*="player ID" i], input[placeholder*="UID" i]');
           if (uidInput && isVisible(uidInput)) {
-            if (Number(task.uidTries || 0) >= 1) {
+            if (loginChecked) {
               renderFloatingBar(task, 'Login Failed', true);
               reportOnce(task, {
                 orderUtr: task.order_utr,
@@ -523,18 +531,23 @@
               stepBusy = false;
               return;
             }
+            if (loginClickedAt) {
+              renderFloatingBar(task, 'Checking Free Fire ID...', false);
+              stepBusy = false;
+              return;
+            }
             if (isInActionCooldown('garena_uid_login', 7000)) {
               renderFloatingBar(task, 'Waiting for Garena UID verification...', false);
               stepBusy = false;
               return;
             }
             markAction('garena_uid_login');
-            chrome.storage.local.set({ activeTask: { ...task, uidTries: 1 } }, () => {
             renderFloatingBar(task, `Entering UID ${task.player_uid} & clicking Login...`, false);
             if (uidInput.value !== String(task.player_uid)) {
               setNativeValue(uidInput, task.player_uid);
             }
             setTimeout(() => {
+              if (`${task.order_utr}:${task.startedAt || 0}` !== loginAttemptKey) return;
               // Strictly pick the real <button>Login</button> next to the UID input (NEVER the "1 Login" heading text!)
               const formScope = uidInput.closest('form') || uidInput.parentElement?.parentElement || document;
               let loginBtn =
@@ -551,9 +564,11 @@
                 loginBtn = allBtns[0] || null;
               }
 
-              if (loginBtn) clickSingleElement(loginBtn);
+              if (loginBtn) {
+                clickSingleElement(loginBtn);
+                loginClickedAt = Date.now();
+              }
             }, FORM_SUBMIT_DELAY_MS);
-            });
           } else {
             if (!isInActionCooldown('garena_select_ff', 5000)) {
               const ffEl = findDeepestByText(/^Free Fire$/i);

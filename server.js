@@ -801,7 +801,7 @@ function requeueOrder(id) {
   pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
     WHERE used_order_utr = ${sqlString(row.arora_order_utr)}`);
   pg(`UPDATE fulfillment_orders
-    SET status = 'QUEUED_EXT', method_used = 'none', account_id = NULL, voucher_ids = NULL, status_reason = '', delivery_attempts = 0
+    SET status = 'QUEUED_EXT', method_used = 'none', account_id = NULL, voucher_ids = NULL, status_reason = '', receipt_note = '', delivery_attempts = 0
     WHERE id = ${id}`);
   if (row.status !== 'QUEUED_EXT') notifyOrderStatus(row, 'QUEUED_EXT', '');
   return { status: 200, body: { ok: true, message: 'Order queued for the extension.' } };
@@ -937,6 +937,7 @@ function finishExtensionOrder(body) {
   }
   if (!order || order.status === 'COMPLETED') return;
   if (status !== 'COMPLETED') {
+    if (order.status !== 'IN_PROGRESS_EXT' && order.status !== 'PROCESSING') return;
     const loginFailed = status === 'LOGIN_FAILED' || loginFailureText(reason);
     cancelUndeliveredOrder(order, reason, receipt, loginFailed ? 'LOGIN_FAILED' : 'CANCELLED');
     return;

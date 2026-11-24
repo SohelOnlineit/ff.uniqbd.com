@@ -185,6 +185,7 @@ async function pollNextOrder(force = false) {
       step: 'GARENA_UID',
       pausedForCaptcha: false,
       startedAt: Date.now(),
+      uidTries: 0,
     };
 
     await chrome.storage.local.set({
@@ -200,10 +201,11 @@ async function pollNextOrder(force = false) {
       url: ['https://shop.garena.my/*', 'https://unipin.com/*', 'https://*.unipin.com/*'],
     });
     let targetTab = null;
+    const freshUrl = `${GARENA_SHOP_URL}&start=${task.startedAt}`;
     if (tabs.length > 0) {
-      targetTab = await chrome.tabs.update(tabs[0].id, { url: GARENA_SHOP_URL, active: true });
+      targetTab = await chrome.tabs.update(tabs[0].id, { url: freshUrl, active: true });
     } else {
-      targetTab = await chrome.tabs.create({ url: GARENA_SHOP_URL, active: true });
+      targetTab = await chrome.tabs.create({ url: freshUrl, active: true });
     }
 
     await chrome.storage.local.set({

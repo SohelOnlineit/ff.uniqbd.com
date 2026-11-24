@@ -1323,7 +1323,7 @@
       }
       body.innerHTML = rows.map((o) => {
         const noteText = o.receipt_note || o.status_reason || '-';
-        const loginFailed = o.status === 'LOGIN_FAILED' || /could not log in|login failed|invalid player|player id not found|wrong player/i.test(o.status_reason || o.receipt_note || '');
+        const loginFailed = o.status === 'LOGIN_FAILED';
         const failed = o.status !== 'COMPLETED' && o.status !== 'QUEUED_EXT' && o.status !== 'IN_PROGRESS_EXT' && o.status !== 'PAUSED' && /error|failed|incorrect/i.test(noteText);
         const stBadge = o.status === 'COMPLETED'
           ? `<span class="pill pill-green">${ICONS.check} Completed</span>`
