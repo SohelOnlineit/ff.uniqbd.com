@@ -1251,7 +1251,13 @@
       dashBusy = true;
       try {
       const d = await api('/admin-api/dashboard');
-      if (!d.ok) return;
+      if (!d.ok) {
+        if (!uniqbdChecked) {
+          uniqbdChecked = true;
+          checkUniqbd();
+        }
+        return;
+      }
       const sig = JSON.stringify(d);
       const updated = document.getElementById('webUpdated');
       if (updated) updated.textContent = 'Last update ' + new Date().toLocaleTimeString();
@@ -1445,11 +1451,15 @@
 
     async function checkUniqbd() {
       setConnect('wait', 'Checking', 'Checking if uniqbd.com is connected.');
-      const result = await api('/admin-api/uniqbd-check', { method: 'POST' });
-      if (result.route_live) {
-        setConnect('ok', 'Connected', 'uniqbd.com is connected to this website.');
-      } else {
-        setConnect('bad', 'Not connected', 'uniqbd.com is not connected right now.');
+      try {
+        const result = await api('/admin-api/uniqbd-check', { method: 'POST' });
+        if (result.route_live) {
+          setConnect('ok', 'Connected', 'uniqbd.com is connected to this website.');
+        } else {
+          setConnect('bad', 'Not connected', result.error || 'uniqbd.com is not connected right now.');
+        }
+      } catch {
+        setConnect('bad', 'Not connected', 'uniqbd.com did not answer.');
       }
     }
 

@@ -385,8 +385,46 @@ const TELEGRAM_STATUS_LABEL = {
   CANCELLED: 'Cancelled',
 };
 
-function ensureTelegramAlertsColumn() {
-  pg('ALTER TABLE resellers ADD COLUMN IF NOT EXISTS telegram_alerts TEXT');
+function ensureDeskColumns() {
+  const statements = [
+    'ALTER TABLE resellers ADD COLUMN IF NOT EXISTS telegram_bot_token_encrypted TEXT',
+    'ALTER TABLE resellers ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT',
+    'ALTER TABLE resellers ADD COLUMN IF NOT EXISTS telegram_alerts TEXT',
+    'ALTER TABLE resellers ADD COLUMN IF NOT EXISTS wallet_balance DOUBLE PRECISION DEFAULT 0',
+    'ALTER TABLE resellers ADD COLUMN IF NOT EXISTS ext_last_seen_at BIGINT',
+    'ALTER TABLE resellers ADD COLUMN IF NOT EXISTS ext_last_ip TEXT',
+    'ALTER TABLE resellers ADD COLUMN IF NOT EXISTS allowed_ips TEXT',
+    'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS status_reason TEXT',
+    'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS receipt_note TEXT',
+    'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS method_used TEXT',
+    'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS webhook_status TEXT',
+    'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS quantity INTEGER DEFAULT 1',
+    'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS arora_order_utr TEXT',
+    'ALTER TABLE unipin_loaded_accounts ADD COLUMN IF NOT EXISTS security_pin_encrypted TEXT',
+    'ALTER TABLE unipin_loaded_accounts ADD COLUMN IF NOT EXISTS masked_email TEXT',
+    'ALTER TABLE unipin_loaded_accounts ADD COLUMN IF NOT EXISTS low_balance_threshold DOUBLE PRECISION DEFAULT 0',
+    'ALTER TABLE unipin_loaded_accounts ADD COLUMN IF NOT EXISTS label TEXT',
+    `CREATE TABLE IF NOT EXISTS extension_status (
+      key_id TEXT PRIMARY KEY,
+      last_seen_at BIGINT,
+      last_ip TEXT
+    )`,
+    `CREATE TABLE IF NOT EXISTS reseller_prices (
+      id SERIAL PRIMARY KEY,
+      reseller_id INTEGER,
+      package_code TEXT,
+      price_bdt DOUBLE PRECISION,
+      updated_at TIMESTAMP,
+      is_active INTEGER
+    )`,
+  ];
+  for (const sql of statements) {
+    try {
+      pg(sql);
+    } catch (err) {
+      console.error('schema update:', dbError(err));
+    }
+  }
 }
 
 function telegramAlertMap(raw) {
@@ -908,17 +946,26 @@ async function probeUniqbdWebhook() {
   }
 }
 
+function dashQuery(label, fn, fallback) {
+  try {
+    return fn();
+  } catch (err) {
+    console.error('dashboard ' + label + ':', dbError(err));
+    return fallback;
+  }
+}
+
 function dashboard() {
-  const stats = pgOne(`
+  const stats = dashQuery('stats', () => pgOne(`
     SELECT COUNT(*) AS total_orders,
            SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_orders,
            SUM(CASE WHEN status NOT IN ('COMPLETED', 'CANCELLED') THEN 1 ELSE 0 END) AS processing_orders
     FROM fulfillment_orders
-  `) || {};
-  const tokens = pgOne("SELECT COUNT(*) AS n FROM unipin_vouchers WHERE lower(status) = 'available'") || {};
-  const balance = pgOne('SELECT COALESCE(SUM(balance), 0) AS n FROM unipin_loaded_accounts') || {};
-  const ext = pgOne('SELECT last_seen_at FROM extension_status LIMIT 1') || {};
-  const reseller = pgOne(`
+  `), {}) || {};
+  const tokens = dashQuery('tokens', () => pgOne("SELECT COUNT(*) AS n FROM unipin_vouchers WHERE lower(status) = 'available'"), {}) || {};
+  const balance = dashQuery('balance', () => pgOne('SELECT COALESCE(SUM(balance), 0) AS n FROM unipin_loaded_accounts'), {}) || {};
+  const ext = dashQuery('extension', () => pgOne('SELECT last_seen_at FROM extension_status LIMIT 1'), {}) || {};
+  const reseller = dashQuery('reseller', () => pgOne(`
     SELECT extension_key, allowed_ips, telegram_chat_id, telegram_alerts,
            (telegram_bot_token_encrypted IS NOT NULL AND telegram_bot_token_encrypted LIKE 'aes256gcm$%') AS telegram_has_token,
            (telegram_bot_token_encrypted IS NOT NULL AND telegram_bot_token_encrypted LIKE 'aes256gcm$%'
@@ -926,8 +973,8 @@ function dashboard() {
     FROM resellers
     ORDER BY id
     LIMIT 1
-  `) || {};
-  const packages = pgJson(`
+  `), {}) || {};
+  const packages = dashQuery('packages', () => pgJson(`
     SELECT p.id, p.package_code, p.arora_service_id, p.name, p.diamonds,
            p.unipin_uc_cost, p.low_stock_threshold, p.is_active,
            (SELECT COUNT(*) FROM unipin_vouchers v
@@ -938,19 +985,19 @@ function dashboard() {
            (SELECT price_bdt FROM reseller_prices r WHERE r.package_code = p.package_code ORDER BY r.reseller_id LIMIT 1) AS price_bdt
     FROM ff_packages p
     ORDER BY p.id
-  `);
-  const accounts = pgJson(`
+  `), []);
+  const accounts = dashQuery('accounts', () => pgJson(`
     SELECT id, label, masked_email, balance, low_balance_threshold, status,
            (security_pin_encrypted IS NOT NULL AND length(security_pin_encrypted) > 0) AS has_security_pin
     FROM unipin_loaded_accounts
     ORDER BY id
-  `);
-  const orders = pgJson(`
+  `), []);
+  const orders = dashQuery('orders', () => pgJson(`
     SELECT id, arora_order_utr, player_uid, package_code, package_name, quantity,
            method_used, status, status_reason, receipt_note, webhook_status, created_at
     FROM fulfillment_orders
     ORDER BY id DESC
-  `);
+  `), []);
   return {
     ok: true,
     extension_status: { online: seenOnline(ext.last_seen_at), last_seen_at: ext.last_seen_at || null },
@@ -974,7 +1021,7 @@ function dashboard() {
       telegram_chat_id: reseller.telegram_chat_id || '',
       telegram_alerts: telegramAlertMap(reseller.telegram_alerts),
     },
-    uniqbd: uniqbdLink(),
+    uniqbd: dashQuery('uniqbd', () => uniqbdLink(), {}),
   };
 }
 
@@ -1233,7 +1280,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 try {
-  ensureTelegramAlertsColumn();
+  ensureDeskColumns();
 } catch (err) {
   console.error('telegram alerts column:', dbError(err));
 }
