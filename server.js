@@ -983,6 +983,22 @@ async function probeUniqbdWebhook() {
   }
 }
 
+function loadDeskOrders() {
+  const columns = `id, arora_order_utr, player_uid, package_code, package_name, quantity,
+           method_used, status, status_reason, receipt_note, webhook_status, created_at`;
+  try {
+    return pgJson(`SELECT ${columns}, shop_order_number FROM fulfillment_orders ORDER BY id DESC`);
+  } catch (err) {
+    console.error('dashboard orders:', dbError(err));
+  }
+  try {
+    return pgJson(`SELECT ${columns}, '' AS shop_order_number FROM fulfillment_orders ORDER BY id DESC`);
+  } catch (err) {
+    console.error('dashboard orders:', dbError(err));
+    return [];
+  }
+}
+
 function dashQuery(label, fn, fallback) {
   try {
     return fn();
@@ -1029,12 +1045,7 @@ function dashboard() {
     FROM unipin_loaded_accounts
     ORDER BY id
   `), []);
-  const orders = dashQuery('orders', () => pgJson(`
-    SELECT id, arora_order_utr, shop_order_number, player_uid, package_code, package_name, quantity,
-           method_used, status, status_reason, receipt_note, webhook_status, created_at
-    FROM fulfillment_orders
-    ORDER BY id DESC
-  `), []);
+  const orders = loadDeskOrders();
   return {
     ok: true,
     extension_status: { online: seenOnline(ext.last_seen_at), last_seen_at: ext.last_seen_at || null },
