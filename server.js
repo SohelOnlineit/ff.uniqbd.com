@@ -23,6 +23,8 @@ const psqlBin = process.env.PSQL_BIN || 'psql';
 
 function publicFile(pathname) {
   if (pathname === '/' || pathname === '/index.html') return 'index.html';
+  if (pathname === '/favicon.webp') return 'favicon.webp';
+  if (pathname === '/logo.webp') return 'logo.webp';
   if (pathname === '/arorashop-ff-extension.zip') return 'arorashop-ff-extension.zip';
   return '';
 }
