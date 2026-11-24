@@ -121,6 +121,7 @@
       transition: border-color 0.15s, box-shadow 0.15s;
     }
     input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0, 186, 199, 0.16); }
+    .order-search { width: 190px; max-width: 100%; padding: 8px 12px; border-radius: 10px; }
     textarea { min-height: 112px; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 13px; }
 
     .btn {
@@ -788,6 +789,7 @@
               Recent Orders
             </div>
             <div style="display:flex;align-items:center;gap:10px;">
+              <input id="orderSearch" class="order-search" type="search" placeholder="Order number" oninput="renderOrders()" />
               <span class="card-sub">Auto & Manual Queue</span>
               <button type="button" class="btn btn-danger btn-sm" onclick="clearPendingOrders()" title="Delete all non-completed orders">
                 <svg class="ico ico-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
@@ -1256,6 +1258,82 @@
 
     let dashSig = '';
     let dashBusy = false;
+    let deskOrders = [];
+
+    function orderIdText(order) {
+      const shop = String(order.shop_order_number || '').trim();
+      if (shop) return /^\d+$/.test(shop) ? '#' + shop : shop;
+      return order.arora_order_utr || '';
+    }
+
+    function orderMatches(order, query) {
+      const typed = String(query || '').trim().toLowerCase();
+      if (!typed) return true;
+      const needle = typed.replace(/^#/, '');
+      const shop = String(order.shop_order_number || '').trim().toLowerCase();
+      const utr = String(order.arora_order_utr || '').trim().toLowerCase();
+      return shop === needle || shop.includes(needle) || utr.includes(typed) || orderIdText(order).toLowerCase().includes(typed);
+    }
+
+    function renderOrders() {
+      const body = document.getElementById('ordersBody');
+      if (!body) return;
+      const query = (document.getElementById('orderSearch') || {}).value || '';
+      const rows = deskOrders.filter((order) => orderMatches(order, query));
+      if (!deskOrders.length) {
+        body.innerHTML = '<tr><td colspan="8" style="color:var(--muted);">No orders yet.</td></tr>';
+        return;
+      }
+      if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="8" style="color:var(--muted);">No order found for this number.</td></tr>';
+        return;
+      }
+      body.innerHTML = rows.map((o) => {
+        const noteText = o.receipt_note || o.status_reason || '-';
+        const failed = o.status !== 'COMPLETED' && o.status !== 'QUEUED_EXT' && o.status !== 'IN_PROGRESS_EXT' && o.status !== 'PAUSED' && /error|failed|incorrect/i.test(noteText);
+        const stBadge = o.status === 'COMPLETED'
+          ? `<span class="pill pill-green">${ICONS.check} Completed</span>`
+          : o.status === 'PAUSED'
+          ? `<span class="pill pill-red">${ICONS.pause} Paused</span>`
+          : o.status === 'CANCELLED'
+          ? `<span class="pill pill-red">Failed</span>`
+          : o.status === 'QUEUED_EXT' || o.status === 'IN_PROGRESS_EXT'
+          ? `<span class="pill pill-blue">${ICONS.clock} Extension Queue</span>`
+          : failed
+          ? `<span class="pill pill-red">Failed</span>`
+          : `<span class="pill pill-amber">${ICONS.clock} Processing</span>`;
+        const mLabel = o.method_used === 'unipin_voucher'
+          ? `<span style="display:inline-flex;align-items:center;gap:5px;">${ICONS.ticket} Token</span>`
+          : o.method_used === 'loaded_account'
+          ? `<span style="display:inline-flex;align-items:center;gap:5px;">${ICONS.card} Account</span>`
+          : o.method_used === 'manual'
+          ? `<span style="display:inline-flex;align-items:center;gap:5px;">${ICONS.wrench} Manual</span>`
+          : `<span style="display:inline-flex;align-items:center;gap:5px;color:var(--muted);">${ICONS.clock} Pending</span>`;
+        const pauseBtnHtml = o.status === 'PAUSED'
+          ? `<button class="btn btn-secondary btn-sm" onclick="togglePauseOrder(${o.id})" title="Resume Order" style="border-color:rgba(0,186,199,0.55);color:#08788c;">${ICONS.play} Resume</button>`
+          : `<button class="btn btn-secondary btn-sm" onclick="togglePauseOrder(${o.id})" title="Pause Order" style="border-color:rgba(245,183,55,0.7);color:#fbbf24;">${ICONS.pause} Pause</button>`;
+        return `
+          <tr>
+            <td><code>${esc(orderIdText(o))}</code></td>
+            <td><code>${o.player_uid}</code></td>
+            <td><b>${o.package_name}</b> <code>${o.package_code}</code> ×${o.quantity}</td>
+            <td>${mLabel}</td>
+            <td>${stBadge}</td>
+            <td style="white-space:nowrap;color:var(--muted);">${whenText(o.created_at)}</td>
+            <td style="max-width:210px;overflow:hidden;text-overflow:ellipsis;color:var(--muted);" title="${noteText.replace(/"/g, '&quot;')}">${noteText}</td>
+            <td>
+              <div style="display:inline-flex;align-items:center;gap:6px;">
+                ${o.status !== 'COMPLETED'
+                  ? `<button class="btn btn-secondary btn-sm" onclick="retryOrder(${o.id})" title="Retry Auto Delivery in Extension" style="border-color:rgba(56,189,248,0.45);color:#38bdf8;">↻ Retry</button><button class="btn btn-primary btn-sm" onclick="manualComplete(${o.id})" title="Mark Completed">${ICONS.check} Complete</button>${pauseBtnHtml}`
+                  : '<span style="color:var(--muted);font-size:12px;margin-right:4px;">Done</span>'}
+                <button class="btn btn-danger btn-sm" onclick="deleteOrder(${o.id})" title="Delete Order">${ICONS.trash}</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
     async function loadDashboard() {
       if (dashBusy) return;
       dashBusy = true;
@@ -1338,52 +1416,8 @@
           </tr>
         `).join('');
 
-      document.getElementById('ordersBody').innerHTML = d.orders.length === 0
-        ? '<tr><td colspan="8" style="color:var(--muted);">No orders yet.</td></tr>'
-        : d.orders.map((o) => {
-          const noteText = o.receipt_note || o.status_reason || '-';
-          const failed = o.status !== 'COMPLETED' && o.status !== 'QUEUED_EXT' && o.status !== 'IN_PROGRESS_EXT' && o.status !== 'PAUSED' && /error|failed|incorrect/i.test(noteText);
-          const stBadge = o.status === 'COMPLETED'
-            ? `<span class="pill pill-green">${ICONS.check} Completed</span>`
-            : o.status === 'PAUSED'
-            ? `<span class="pill pill-red">${ICONS.pause} Paused</span>`
-            : o.status === 'CANCELLED'
-            ? `<span class="pill pill-red">Failed</span>`
-            : o.status === 'QUEUED_EXT' || o.status === 'IN_PROGRESS_EXT'
-            ? `<span class="pill pill-blue">${ICONS.clock} Extension Queue</span>`
-            : failed
-            ? `<span class="pill pill-red">Failed</span>`
-            : `<span class="pill pill-amber">${ICONS.clock} Processing</span>`;
-          const mLabel = o.method_used === 'unipin_voucher'
-            ? `<span style="display:inline-flex;align-items:center;gap:5px;">${ICONS.ticket} Token</span>`
-            : o.method_used === 'loaded_account'
-            ? `<span style="display:inline-flex;align-items:center;gap:5px;">${ICONS.card} Account</span>`
-            : o.method_used === 'manual'
-            ? `<span style="display:inline-flex;align-items:center;gap:5px;">${ICONS.wrench} Manual</span>`
-            : `<span style="display:inline-flex;align-items:center;gap:5px;color:var(--muted);">${ICONS.clock} Pending</span>`;
-          const pauseBtnHtml = o.status === 'PAUSED'
-            ? `<button class="btn btn-secondary btn-sm" onclick="togglePauseOrder(${o.id})" title="Resume Order" style="border-color:rgba(0,186,199,0.55);color:#08788c;">${ICONS.play} Resume</button>`
-            : `<button class="btn btn-secondary btn-sm" onclick="togglePauseOrder(${o.id})" title="Pause Order" style="border-color:rgba(245,183,55,0.7);color:#fbbf24;">${ICONS.pause} Pause</button>`;
-          return `
-            <tr>
-              <td><code>${esc(o.shop_order_number || o.arora_order_utr)}</code></td>
-              <td><code>${o.player_uid}</code></td>
-              <td><b>${o.package_name}</b> <code>${o.package_code}</code> ×${o.quantity}</td>
-              <td>${mLabel}</td>
-              <td>${stBadge}</td>
-              <td style="white-space:nowrap;color:var(--muted);">${whenText(o.created_at)}</td>
-              <td style="max-width:210px;overflow:hidden;text-overflow:ellipsis;color:var(--muted);" title="${noteText.replace(/"/g, '&quot;')}">${noteText}</td>
-              <td>
-                <div style="display:inline-flex;align-items:center;gap:6px;">
-                  ${o.status !== 'COMPLETED'
-                    ? `<button class="btn btn-secondary btn-sm" onclick="retryOrder(${o.id})" title="Retry Auto Delivery in Extension" style="border-color:rgba(56,189,248,0.45);color:#38bdf8;">↻ Retry</button><button class="btn btn-primary btn-sm" onclick="manualComplete(${o.id})" title="Mark Completed">${ICONS.check} Complete</button>${pauseBtnHtml}`
-                    : '<span style="color:var(--muted);font-size:12px;margin-right:4px;">Done</span>'}
-                  <button class="btn btn-danger btn-sm" onclick="deleteOrder(${o.id})" title="Delete Order">${ICONS.trash}</button>
-                </div>
-              </td>
-            </tr>
-          `;
-        }).join('');
+      deskOrders = d.orders || [];
+      renderOrders();
 
       const s = d.security_info || {};
       const keyBox = document.getElementById('setExtKey');

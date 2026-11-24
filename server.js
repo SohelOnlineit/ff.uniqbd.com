@@ -599,11 +599,15 @@ function placeResellerOrder(reseller, body, ip) {
   const created = [];
   for (let index = 1; index <= quantity; index += 1) {
     const resellerOrderId = quantity === 1 ? orderId : orderId + '#' + index;
-    const existing = pgOne(`SELECT arora_order_utr, status, package_code, package_name
+    const existing = pgOne(`SELECT id, arora_order_utr, shop_order_number, status, package_code, package_name
       FROM fulfillment_orders
       WHERE reseller_id = ${Number(reseller.id)} AND reseller_order_id = ${sqlString(resellerOrderId)}
       LIMIT 1`);
     if (existing) {
+      if (shopOrderNumber && !String(existing.shop_order_number || '').trim()) {
+        pg(`UPDATE fulfillment_orders SET shop_order_number = ${sqlString(shopOrderNumber)} WHERE id = ${Number(existing.id)}`);
+        existing.shop_order_number = shopOrderNumber;
+      }
       created.push(existing);
       continue;
     }
