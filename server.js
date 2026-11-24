@@ -401,6 +401,7 @@ function ensureDeskColumns() {
     'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS quantity INTEGER DEFAULT 1',
     'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS arora_order_utr TEXT',
     'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS shop_order_number TEXT',
+    'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS delivery_attempts INTEGER DEFAULT 0',
     'ALTER TABLE unipin_loaded_accounts ADD COLUMN IF NOT EXISTS security_pin_encrypted TEXT',
     'ALTER TABLE unipin_loaded_accounts ADD COLUMN IF NOT EXISTS masked_email TEXT',
     'ALTER TABLE unipin_loaded_accounts ADD COLUMN IF NOT EXISTS low_balance_threshold DOUBLE PRECISION DEFAULT 0',
@@ -649,10 +650,26 @@ function voucherChannel(serial) {
   };
 }
 
+const DELIVERY_TRY_LIMIT = 2;
+const DELIVERY_STOP_REASON = 'Delivery failed after 2 tries. The extension will not try this order again.';
+
+function stopOverTriedOrders() {
+  const rows = pgJson(`SELECT id, arora_order_utr, shop_order_number, player_uid, package_name, status
+    FROM fulfillment_orders
+    WHERE status = 'QUEUED_EXT' AND COALESCE(delivery_attempts, 0) >= ${DELIVERY_TRY_LIMIT}`);
+  rows.forEach((row) => {
+    pg(`UPDATE fulfillment_orders
+      SET status = 'CANCELLED', status_reason = ${sqlString(DELIVERY_STOP_REASON)}, method_used = 'none', voucher_ids = NULL, account_id = NULL
+      WHERE id = ${Number(row.id)} AND status = 'QUEUED_EXT'`);
+    notifyOrderStatus(row, 'CANCELLED', DELIVERY_STOP_REASON);
+  });
+}
+
 function claimNextTask() {
+  stopOverTriedOrders();
   const order = pgOne(`SELECT id, arora_order_utr, shop_order_number, player_uid, package_code, package_name, account_id
     FROM fulfillment_orders
-    WHERE status = 'QUEUED_EXT'
+    WHERE status = 'QUEUED_EXT' AND COALESCE(delivery_attempts, 0) < ${DELIVERY_TRY_LIMIT}
     ORDER BY id
     LIMIT 1`);
   if (!order) return null;
@@ -664,7 +681,7 @@ function claimNextTask() {
     const parts = splitVoucher(plain);
     if (plain && parts.serial && parts.pin) {
       pg(`UPDATE unipin_vouchers SET status = 'used', used_order_utr = ${sqlString(order.arora_order_utr)}, used_at = CURRENT_TIMESTAMP WHERE id = ${Number(voucher.id)}`);
-      pg(`UPDATE fulfillment_orders SET status = 'IN_PROGRESS_EXT', method_used = 'unipin_voucher', voucher_ids = ${sqlString(String(voucher.id))} WHERE id = ${Number(order.id)}`);
+      pg(`UPDATE fulfillment_orders SET status = 'IN_PROGRESS_EXT', method_used = 'unipin_voucher', voucher_ids = ${sqlString(String(voucher.id))}, delivery_attempts = COALESCE(delivery_attempts, 0) + 1 WHERE id = ${Number(order.id)}`);
       notifyOrderStatus(order, 'IN_PROGRESS_EXT', '');
       const channel = voucherChannel(parts.serial);
       return {
@@ -693,7 +710,7 @@ function claimNextTask() {
   const password = decryptSecret(account.credentials_encrypted);
   const pin = decryptSecret(account.security_pin_encrypted);
   if (!email || !password || !pin) return null;
-  pg(`UPDATE fulfillment_orders SET status = 'IN_PROGRESS_EXT', method_used = 'loaded_account', account_id = ${Number(account.id)} WHERE id = ${Number(order.id)}`);
+  pg(`UPDATE fulfillment_orders SET status = 'IN_PROGRESS_EXT', method_used = 'loaded_account', account_id = ${Number(account.id)}, delivery_attempts = COALESCE(delivery_attempts, 0) + 1 WHERE id = ${Number(order.id)}`);
   notifyOrderStatus(order, 'IN_PROGRESS_EXT', '');
   return {
     order_utr: order.arora_order_utr,
@@ -712,7 +729,7 @@ function requeueOrder(id) {
   pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
     WHERE used_order_utr = ${sqlString(row.arora_order_utr)}`);
   pg(`UPDATE fulfillment_orders
-    SET status = 'QUEUED_EXT', method_used = 'none', account_id = NULL, voucher_ids = NULL, status_reason = ''
+    SET status = 'QUEUED_EXT', method_used = 'none', account_id = NULL, voucher_ids = NULL, status_reason = '', delivery_attempts = 0
     WHERE id = ${id}`);
   if (row.status !== 'QUEUED_EXT') notifyOrderStatus(row, 'QUEUED_EXT', '');
   return { status: 200, body: { ok: true, message: 'Order queued for the extension.' } };
@@ -753,14 +770,30 @@ function finishExtensionOrder(body) {
   const reason = String(body.error_message || body.receipt_note || '').slice(0, 500);
   const receipt = String(body.receipt_note || '').slice(0, 500);
   if (!utr) return;
-  const order = pgOne(`SELECT status, arora_order_utr, shop_order_number, player_uid, package_code, package_name, quantity, reseller_order_id, account_id, order_price_bdt
+  const order = pgOne(`SELECT status, arora_order_utr, shop_order_number, player_uid, package_code, package_name, quantity, reseller_order_id, account_id, order_price_bdt, delivery_attempts
     FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(utr)} LIMIT 1`);
   if (!order) return;
+  const stopTrying = status !== 'COMPLETED' && num(order.delivery_attempts) >= DELIVERY_TRY_LIMIT;
   if (body.release_voucher && status !== 'COMPLETED') {
     pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
       WHERE used_order_utr = ${sqlString(utr)}`);
+    if (stopTrying) {
+      pg(`UPDATE fulfillment_orders
+        SET voucher_ids = NULL, method_used = 'none', account_id = NULL, status = 'CANCELLED', status_reason = ${sqlString(DELIVERY_STOP_REASON)}
+        WHERE arora_order_utr = ${sqlString(utr)}`);
+      if (order.status !== 'CANCELLED') notifyOrderStatus(order, 'CANCELLED', DELIVERY_STOP_REASON);
+      return;
+    }
     pg(`UPDATE fulfillment_orders SET voucher_ids = NULL, method_used = 'none', status = 'QUEUED_EXT' WHERE arora_order_utr = ${sqlString(utr)}`);
     if (order.status !== 'QUEUED_EXT') notifyOrderStatus(order, 'QUEUED_EXT', '');
+    return;
+  }
+  if (stopTrying) {
+    const stopped = reason || DELIVERY_STOP_REASON;
+    pg(`UPDATE fulfillment_orders
+      SET status = 'CANCELLED', status_reason = ${sqlString(stopped)}, receipt_note = ${sqlString(receipt)}
+      WHERE arora_order_utr = ${sqlString(utr)}`);
+    if (order.status !== 'CANCELLED') notifyOrderStatus(order, 'CANCELLED', stopped);
     return;
   }
   const completed = status === 'COMPLETED' ? ', completed_at = CURRENT_TIMESTAMP' : '';
