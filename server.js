@@ -1041,10 +1041,11 @@ function dashboard() {
   const tokens = dashQuery('tokens', () => pgOne("SELECT COUNT(*) AS n FROM unipin_vouchers WHERE lower(status) = 'available'"), {}) || {};
   const balance = dashQuery('balance', () => pgOne('SELECT COALESCE(SUM(balance), 0) AS n FROM unipin_loaded_accounts'), {}) || {};
   const ext = dashQuery('extension', () => pgOne('SELECT last_seen_at FROM extension_status LIMIT 1'), {}) || {};
+  const keyRow = dashQuery('extension-key', () => pgOne('SELECT extension_key FROM resellers ORDER BY id LIMIT 1'), {}) || {};
   const reseller = dashQuery('reseller', () => pgOne(`
-    SELECT extension_key, allowed_ips, telegram_chat_id, telegram_alerts,
-           (telegram_bot_token_encrypted IS NOT NULL AND telegram_bot_token_encrypted LIKE 'aes256gcm$%') AS telegram_has_token,
-           (telegram_bot_token_encrypted IS NOT NULL AND telegram_bot_token_encrypted LIKE 'aes256gcm$%'
+    SELECT allowed_ips, telegram_chat_id, telegram_alerts,
+           (telegram_bot_token_encrypted IS NOT NULL AND position('aes256gcm' in telegram_bot_token_encrypted) = 1) AS telegram_has_token,
+           (telegram_bot_token_encrypted IS NOT NULL AND position('aes256gcm' in telegram_bot_token_encrypted) = 1
              AND telegram_chat_id IS NOT NULL AND length(telegram_chat_id) > 0) AS telegram_connected
     FROM resellers
     ORDER BY id
@@ -1083,7 +1084,7 @@ function dashboard() {
     accounts,
     orders,
     security_info: {
-      extension_key: reseller.extension_key || '',
+      extension_key: keyRow.extension_key || '',
       encryption: 'AES-256',
       auth_scheme: 'Bearer',
       allowed_ips: reseller.allowed_ips || '127.0.0.1',

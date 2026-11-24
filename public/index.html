@@ -1723,10 +1723,35 @@
 
     function copyExtKey(id) {
       const box = document.getElementById(typeof id === 'string' ? id : 'setExtKey');
-      const val = (box && box.dataset.full) || '';
-      if (!val) return;
-      navigator.clipboard.writeText(val);
-      showToast('Extension Key copied!');
+      const val = box ? String(box.dataset.full || box.getAttribute('data-full') || '') : '';
+      if (!val) {
+        showToast('Extension key is not loaded yet.');
+        return;
+      }
+      const done = () => showToast('Extension Key copied!');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(val).then(done).catch(() => {
+          if (copyWithBox(val)) done();
+          else showToast('Could not copy the key.');
+        });
+        return;
+      }
+      if (copyWithBox(val)) done();
+      else showToast('Could not copy the key.');
+    }
+
+    function copyWithBox(val) {
+      const area = document.createElement('textarea');
+      area.value = val;
+      area.setAttribute('readonly', '');
+      area.style.position = 'fixed';
+      area.style.left = '-9999px';
+      document.body.appendChild(area);
+      area.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch { ok = false; }
+      area.remove();
+      return ok;
     }
 
     setInterval(() => {
