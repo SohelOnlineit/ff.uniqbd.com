@@ -1323,11 +1323,14 @@
       }
       body.innerHTML = rows.map((o) => {
         const noteText = o.receipt_note || o.status_reason || '-';
+        const loginFailed = o.status === 'LOGIN_FAILED' || /could not log in|login failed|invalid player|player id not found|wrong player/i.test(o.status_reason || o.receipt_note || '');
         const failed = o.status !== 'COMPLETED' && o.status !== 'QUEUED_EXT' && o.status !== 'IN_PROGRESS_EXT' && o.status !== 'PAUSED' && /error|failed|incorrect/i.test(noteText);
         const stBadge = o.status === 'COMPLETED'
           ? `<span class="pill pill-green">${ICONS.check} Completed</span>`
           : o.status === 'PAUSED'
           ? `<span class="pill pill-red">${ICONS.pause} Paused</span>`
+          : loginFailed
+          ? `<span class="pill pill-red">Login Failed</span>`
           : o.status === 'CANCELLED'
           ? `<span class="pill pill-red">Cancelled</span>`
           : o.status === 'QUEUED_EXT' || o.status === 'IN_PROGRESS_EXT'
@@ -1358,6 +1361,8 @@
               <div style="display:inline-flex;align-items:center;gap:6px;">
                 ${o.status === 'COMPLETED'
                   ? '<span style="color:#34d399;font-size:12px;margin-right:4px;">Done</span>'
+                  : loginFailed
+                  ? `<span style="color:#fb7185;font-size:12px;margin-right:4px;">Login Failed</span><button class="btn btn-secondary btn-sm" onclick="retryOrder(${o.id})" title="Try this order again" style="border-color:rgba(56,189,248,0.45);color:#38bdf8;">↻ Retry</button>`
                   : o.status === 'CANCELLED'
                   ? `<span style="color:#fb7185;font-size:12px;margin-right:4px;">Cancelled</span><button class="btn btn-secondary btn-sm" onclick="retryOrder(${o.id})" title="Try this order again" style="border-color:rgba(56,189,248,0.45);color:#38bdf8;">↻ Retry</button>`
                   : `<button class="btn btn-secondary btn-sm" onclick="retryOrder(${o.id})" title="Retry Auto Delivery in Extension" style="border-color:rgba(56,189,248,0.45);color:#38bdf8;">↻ Retry</button><button class="btn btn-primary btn-sm" onclick="manualComplete(${o.id})" title="Mark Completed">${ICONS.check} Complete</button>${pauseBtnHtml}`}

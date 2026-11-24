@@ -252,6 +252,8 @@ async function submitOrderResult({ orderUtr, status, receiptNote, errorMessage, 
       activeTabId: null,
       lastLog: status === 'COMPLETED'
         ? `Completed ${orderUtr}`
+        : status === 'LOGIN_FAILED'
+        ? `Login Failed ${orderUtr}`
         : `Cancelled ${orderUtr}`,
     });
 

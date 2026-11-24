@@ -835,19 +835,27 @@ function orderActionResult(id, action, body) {
   return { status: 200, body: { ok: true } };
 }
 
-function cancelUndeliveredOrder(order, reason, receipt) {
-  const why = String(reason || 'The extension could not deliver the diamonds. This order is cancelled.').slice(0, 500);
+function loginFailureText(text) {
+  return /could not log in|login failed|invalid player|player id not found|player not found|wrong player|wrong free fire/i.test(String(text || ''));
+}
+
+function cancelUndeliveredOrder(order, reason, receipt, nextStatus) {
+  const loginFailed = nextStatus === 'LOGIN_FAILED' || loginFailureText(reason);
+  const next = loginFailed ? 'LOGIN_FAILED' : 'CANCELLED';
+  const why = String(reason || (loginFailed
+    ? 'Login Failed. The extension could not log in to this Free Fire ID.'
+    : 'The extension could not deliver the diamonds. This order is cancelled.')).slice(0, 500);
   const note = String(receipt || '').slice(0, 500);
   const utr = sqlString(order.arora_order_utr);
   try {
     pg(`UPDATE fulfillment_orders
-      SET status = 'CANCELLED', status_reason = ${sqlString(why)}, receipt_note = ${sqlString(note)},
+      SET status = ${sqlString(next)}, status_reason = ${sqlString(why)}, receipt_note = ${sqlString(note)},
           voucher_ids = NULL, method_used = 'none', account_id = NULL
       WHERE arora_order_utr = ${utr} AND status <> 'COMPLETED'`);
   } catch (err) {
     console.error('cancel order:', dbError(err));
     pg(`UPDATE fulfillment_orders
-      SET status = 'CANCELLED', status_reason = ${sqlString(why)}
+      SET status = ${sqlString(next)}, status_reason = ${sqlString(why)}
       WHERE arora_order_utr = ${utr} AND status <> 'COMPLETED'`);
   }
   try {
@@ -856,7 +864,7 @@ function cancelUndeliveredOrder(order, reason, receipt) {
   } catch (err) {
     console.error('return token:', dbError(err));
   }
-  if (order.status !== 'CANCELLED') notifyOrderStatus(order, 'CANCELLED', why);
+  if (order.status !== next) notifyOrderStatus(order, 'CANCELLED', why);
 }
 
 function cancelStuckProcessingOrders() {
@@ -913,7 +921,7 @@ function restoreUnusedTokens() {
 
 function finishExtensionOrder(body) {
   const utr = String(body.order_utr || '').trim().slice(0, 80);
-  const allowed = ['COMPLETED', 'PROCESSING', 'PAUSED', 'CANCELLED', 'QUEUED_EXT', 'IN_PROGRESS_EXT'];
+  const allowed = ['COMPLETED', 'PROCESSING', 'PAUSED', 'CANCELLED', 'LOGIN_FAILED', 'QUEUED_EXT', 'IN_PROGRESS_EXT'];
   const status = allowed.includes(body.status) ? body.status : 'CANCELLED';
   const reason = String(body.error_message || body.receipt_note || '').slice(0, 500);
   const receipt = String(body.receipt_note || '').slice(0, 500);
@@ -929,7 +937,8 @@ function finishExtensionOrder(body) {
   }
   if (!order || order.status === 'COMPLETED') return;
   if (status !== 'COMPLETED') {
-    cancelUndeliveredOrder(order, reason, receipt);
+    const loginFailed = status === 'LOGIN_FAILED' || loginFailureText(reason);
+    cancelUndeliveredOrder(order, reason, receipt, loginFailed ? 'LOGIN_FAILED' : 'CANCELLED');
     return;
   }
   pg(`UPDATE fulfillment_orders
@@ -1155,7 +1164,7 @@ function dashboard() {
   const stats = dashQuery('stats', () => pgOne(`
     SELECT COUNT(*) AS total_orders,
            SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_orders,
-           SUM(CASE WHEN status NOT IN ('COMPLETED', 'CANCELLED') THEN 1 ELSE 0 END) AS processing_orders
+           SUM(CASE WHEN status NOT IN ('COMPLETED', 'CANCELLED', 'LOGIN_FAILED') THEN 1 ELSE 0 END) AS processing_orders
     FROM fulfillment_orders
   `), {}) || {};
   const tokens = dashQuery('tokens', () => pgOne("SELECT COUNT(*) AS n FROM unipin_vouchers WHERE lower(status) = 'available'"), {}) || {};

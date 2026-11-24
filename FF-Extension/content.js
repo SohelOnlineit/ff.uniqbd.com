@@ -236,7 +236,7 @@
 
     bar.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <strong style="color:#15b48b;font-size:13px;">AroraShop Helper v1.4.4</strong>
+        <strong style="color:#15b48b;font-size:13px;">AroraShop Helper v1.4.5</strong>
         <span style="background:rgba(21,180,139,0.16);color:#34d399;padding:2px 7px;border-radius:99px;font-size:11px;font-weight:600;">${task.order_utr}</span>
       </div>
       <div style="color:#cbd5e1;margin-bottom:4px;">UID: <b>${task.player_uid}</b> &bull; <b>${task.denom_label}</b></div>
@@ -499,11 +499,11 @@
 
           const bodyTxt = document.body?.innerText || '';
           if (/invalid player|player id not found|player not found|account not found|does not exist|incorrect player|wrong player|not a valid|check your (player )?id/i.test(bodyTxt)) {
-            renderFloatingBar(task, 'Wrong Free Fire ID. Order cancelled.', true);
+            renderFloatingBar(task, 'Login Failed', true);
             reportOnce(task, {
               orderUtr: task.order_utr,
-              status: 'CANCELLED',
-              errorMessage: `Could not log in to Free Fire ID ${task.player_uid}. The order is cancelled.`,
+              status: 'LOGIN_FAILED',
+              errorMessage: `Login Failed. Could not log in to Free Fire ID ${task.player_uid}.`,
               releaseVoucher: true,
             });
             stepBusy = false;
@@ -513,11 +513,11 @@
           const uidInput = document.querySelector('input[placeholder*="player ID" i], input[placeholder*="UID" i]');
           if (uidInput && isVisible(uidInput)) {
             if (Number(task.uidTries || 0) >= 1) {
-              renderFloatingBar(task, 'Could not log in to this Free Fire ID. Order cancelled.', true);
+              renderFloatingBar(task, 'Login Failed', true);
               reportOnce(task, {
                 orderUtr: task.order_utr,
-                status: 'CANCELLED',
-                errorMessage: `Could not log in to Free Fire ID ${task.player_uid}. The order is cancelled.`,
+                status: 'LOGIN_FAILED',
+                errorMessage: `Login Failed. Could not log in to Free Fire ID ${task.player_uid}.`,
                 releaseVoucher: true,
               });
               stepBusy = false;
