@@ -103,19 +103,34 @@ async function closeFulfillmentTab(tabId) {
 }
 
 async function pingDesk(st) {
-  if (!st.extKey) return;
+  if (!st.extKey) return { ok: false, error: 'Extension key is not saved' };
   try {
-    await fetch(`${st.apiBase}/ext-api/ping`, {
+    const res = await fetch(`${st.apiBase}/ext-api/ping`, {
       method: 'GET',
       headers: { 'X-Extension-Key': st.extKey },
     });
-  } catch (_) {}
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 404) return { ok: true };
+    if (!res.ok || data.ok === false) {
+      return { ok: false, error: data.error || 'Website rejected the extension key' };
+    }
+    return { ok: true };
+  } catch (_) {
+    return { ok: false, error: 'Cannot reach ff.uniqbd.com' };
+  }
 }
 
 async function pollNextOrder(force = false) {
   const st = await getSettings();
-  if (!st.extKey) return { ok: false, error: 'Extension Key not set.' };
-  await pingDesk(st);
+  if (!st.extKey) {
+    await chrome.storage.local.set({ lastLog: 'Extension key is not saved' });
+    return { ok: false, error: 'Extension key is not saved' };
+  }
+  const ping = await pingDesk(st);
+  if (!ping.ok) {
+    await chrome.storage.local.set({ lastLog: ping.error });
+    return ping;
+  }
   if (st.pendingResult && st.pendingResult.orderUtr) {
     const sent = await submitOrderResult(st.pendingResult, null);
     if (!sent || sent.ok === false) return { ok: false, error: 'Website did not save the order status' };
@@ -158,7 +173,8 @@ async function pollNextOrder(force = false) {
   }
 
   if (!force && (!st.autoListen || st.activeTask)) {
-    return { ok: true, skipped: true };
+    if (!st.activeTask) await chrome.storage.local.set({ lastLog: 'Connected to ff.uniqbd.com' });
+    return { ok: true, connected: true, skipped: true };
   }
 
   try {
@@ -280,8 +296,8 @@ async function submitOrderResult({ orderUtr, status, receiptNote, errorMessage, 
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type === 'POLL_NOW') {
-    pollNextOrder(true).then(sendResponse);
+  if (msg.type === 'POLL_NOW' || msg.type === 'CHECK_CONNECTION') {
+    pollNextOrder(msg.type === 'POLL_NOW').then(sendResponse);
     return true;
   }
   if (msg.type === 'REPORT_ORDER_RESULT') {

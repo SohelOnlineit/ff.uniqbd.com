@@ -10,11 +10,11 @@ document.addEventListener('DOMContentLoaded', () => {
       apiBaseEl.value = !savedBase || savedBase === 'https://api.arorashop.com' ? 'https://ff.uniqbd.com' : savedBase;
       if (res.extKey) extKeyEl.value = res.extKey;
       autoListenEl.checked = Boolean(res.autoListen);
-      if (res.activeTask) {
-        statusBox.textContent = `Active: ${res.activeTask.order_utr} (UID: ${res.activeTask.player_uid})`;
-      } else {
-        statusBox.textContent = res.lastLog || 'Idle';
-      }
+      const text = res.activeTask
+        ? `Active: ${res.activeTask.order_utr} (UID: ${res.activeTask.player_uid})`
+        : (res.lastLog || 'Not connected');
+      statusBox.textContent = text;
+      statusBox.style.color = /not saved|rejected|cannot reach|failed|error/i.test(text) ? '#fb7185' : '#34d399';
     });
   }
 
@@ -24,9 +24,11 @@ document.addEventListener('DOMContentLoaded', () => {
         apiBase: apiBaseEl.value.trim() || 'https://ff.uniqbd.com',
         extKey: extKeyEl.value.trim(),
         autoListen: autoListenEl.checked,
-        lastLog: 'Settings saved',
+        lastLog: 'Connecting to ff.uniqbd.com...',
       },
-      () => refreshUI()
+      () => {
+        chrome.runtime.sendMessage({ type: 'CHECK_CONNECTION' }, () => refreshUI());
+      }
     );
   });
 
