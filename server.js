@@ -257,11 +257,13 @@ function tokenStamp(passwordHash) {
   return crypto.createHash('sha256').update(String(passwordHash || '')).digest('base64url').slice(0, 16);
 }
 
+const SESSION_MS = 5 * 365 * 24 * 60 * 60 * 1000;
+
 function signToken(username, passwordHash) {
   const body = Buffer.from(JSON.stringify({
     u: username,
     s: tokenStamp(passwordHash),
-    exp: Date.now() + 12 * 60 * 60 * 1000,
+    exp: Date.now() + SESSION_MS,
   })).toString('base64url');
   const sig = crypto.createHmac('sha256', authSecret).update(body).digest('base64url');
   return body + '.' + sig;
@@ -1562,7 +1564,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/admin-api/me') {
     const username = readToken(req);
     if (!username) return sendJson(res, 401, { ok: false });
-    return sendJson(res, 200, { ok: true, username });
+    const row = pgOne(`SELECT username, password_hash FROM admins WHERE username = ${sqlString(username)} LIMIT 1`);
+    if (!row) return sendJson(res, 401, { ok: false });
+    return sendJson(res, 200, { ok: true, username: row.username, token: signToken(row.username, row.password_hash) });
   }
 
   if (pathname === '/admin-api/password' && req.method === 'POST') {

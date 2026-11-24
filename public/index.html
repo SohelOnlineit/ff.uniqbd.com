@@ -1410,6 +1410,7 @@
       }
       const me = await api('/admin-api/me');
       if (me.ok) {
+        if (me.token) localStorage.setItem('arora_admin_token', me.token);
         document.getElementById('loginView').classList.add('hidden');
         document.getElementById('appView').classList.remove('hidden');
         const savedTab = localStorage.getItem('arora_active_tab') || 'website';
