@@ -861,7 +861,6 @@ function cancelStuckProcessingOrders() {
         FROM fulfillment_orders WHERE status = 'PROCESSING'`);
     } catch (err2) {
       console.error('cancel stuck orders:', dbError(err2));
-      return;
     }
   }
   rows.forEach((row) => {
@@ -871,6 +870,33 @@ function cancelStuckProcessingOrders() {
       console.error('cancel stuck orders:', dbError(err));
     }
   });
+  restoreUnusedTokens();
+}
+
+function restoreUnusedTokens() {
+  const release = `UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
+    WHERE lower(status) <> 'available'
+      AND COALESCE(used_order_utr, '') <> ''
+      AND used_order_utr NOT IN (
+        SELECT arora_order_utr FROM fulfillment_orders
+        WHERE status = 'COMPLETED' AND arora_order_utr IS NOT NULL
+      )`;
+  const keepFresh = ` AND used_order_utr NOT IN (
+        SELECT arora_order_utr FROM fulfillment_orders
+        WHERE status = 'IN_PROGRESS_EXT' AND claimed_at IS NOT NULL
+          AND claimed_at >= CURRENT_TIMESTAMP - INTERVAL '4 minutes'
+          AND arora_order_utr IS NOT NULL
+      )`;
+  try {
+    pg(release + keepFresh);
+  } catch (err) {
+    console.error('restore tokens:', dbError(err));
+    try {
+      pg(release);
+    } catch (err2) {
+      console.error('restore tokens:', dbError(err2));
+    }
+  }
 }
 
 function finishExtensionOrder(body) {
