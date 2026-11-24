@@ -494,12 +494,12 @@
           }
 
           const bodyTxt = document.body?.innerText || '';
-          if (/Invalid Player ID|Player ID not found|Account not found/i.test(bodyTxt)) {
-            renderFloatingBar(task, 'Invalid Player ID! Notifying Admin & closing tab...', true);
+          if (/invalid player|player id not found|player not found|account not found|does not exist|incorrect player|wrong player|not a valid|check your (player )?id/i.test(bodyTxt)) {
+            renderFloatingBar(task, 'Wrong Free Fire ID. Order cancelled.', true);
             reportOnce(task, {
               orderUtr: task.order_utr,
               status: 'CANCELLED',
-              errorMessage: `Invalid Player UID (${task.player_uid}) on Garena Shop — Manual check required`,
+              errorMessage: `Could not log in to Free Fire ID ${task.player_uid}. The order is cancelled.`,
               releaseVoucher: true,
             });
             stepBusy = false;
@@ -508,12 +508,12 @@
 
           const uidInput = document.querySelector('input[placeholder*="player ID" i], input[placeholder*="UID" i]');
           if (uidInput && isVisible(uidInput)) {
-            if (Number(task.uidTries || 0) >= 2) {
-              renderFloatingBar(task, 'Could not deliver diamonds after 2 tries.', true);
+            if (Number(task.uidTries || 0) >= 1) {
+              renderFloatingBar(task, 'Could not log in to this Free Fire ID. Order cancelled.', true);
               reportOnce(task, {
                 orderUtr: task.order_utr,
                 status: 'CANCELLED',
-                errorMessage: `Could not deliver diamonds to UID ${task.player_uid} after 2 tries`,
+                errorMessage: `Could not log in to Free Fire ID ${task.player_uid}. The order is cancelled.`,
                 releaseVoucher: true,
               });
               stepBusy = false;
@@ -525,7 +525,7 @@
               return;
             }
             markAction('garena_uid_login');
-            chrome.storage.local.set({ activeTask: { ...task, uidTries: Number(task.uidTries || 0) + 1 } });
+            chrome.storage.local.set({ activeTask: { ...task, uidTries: 1 } }, () => {
             renderFloatingBar(task, `Entering UID ${task.player_uid} & clicking Login...`, false);
             if (uidInput.value !== String(task.player_uid)) {
               setNativeValue(uidInput, task.player_uid);
@@ -549,6 +549,7 @@
 
               if (loginBtn) clickSingleElement(loginBtn);
             }, FORM_SUBMIT_DELAY_MS);
+            });
           } else {
             if (!isInActionCooldown('garena_select_ff', 5000)) {
               const ffEl = findDeepestByText(/^Free Fire$/i);
