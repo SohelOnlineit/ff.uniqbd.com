@@ -398,6 +398,28 @@
     .pill-red { background: rgba(244, 63, 94, 0.16); color: #fb7185; }
     .pill-blue { background: rgba(38, 191, 176, 0.16); color: #67e8f9; }
 
+    .connect-banner {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 18px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      margin-bottom: 14px;
+      background: var(--surface);
+    }
+    .connect-banner strong { display: block; font-size: 22px; line-height: 1.2; }
+    .connect-banner p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    .connect-dot { width: 18px; height: 18px; border-radius: 50%; flex: none; background: #fbbf24; }
+    .connect-banner.ok { background: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.45); }
+    .connect-banner.ok strong { color: #34d399; }
+    .connect-banner.ok .connect-dot { background: #34d399; box-shadow: 0 0 12px #34d399; }
+    .connect-banner.bad { background: rgba(244, 63, 94, 0.12); border-color: rgba(244, 63, 94, 0.45); }
+    .connect-banner.bad strong { color: #fb7185; }
+    .connect-banner.bad .connect-dot { background: #fb7185; }
+    .connect-banner.wait .connect-dot { background: #fbbf24; }
+    .connect-banner.wait strong { color: #fbbf24; }
+
     .sec-list { list-style: none; display: flex; flex-direction: column; gap: 11px; }
     .sec-row {
       display: flex;
@@ -568,6 +590,10 @@
           </div>
         </div>
         <div class="topbar-actions">
+          <span id="uniqbdLiveBadge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:700;background:rgba(245,183,55,.16);color:#fbbf24;border:1px solid rgba(245,183,55,.4);">
+            <span style="width:8px;height:8px;border-radius:50%;background:#fbbf24;display:inline-block;"></span>
+            UniQbd Checking
+          </span>
           <span id="extLiveBadge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:700;background:rgba(244,63,94,.16);color:#fb7185;border:1px solid rgba(244,63,94,.35);">
             <span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
             Extension Offline
@@ -645,7 +671,14 @@
               <button type="button" class="btn btn-secondary btn-sm" onclick="checkUniqbd()">Check UniQbd</button>
             </div>
           </div>
-          <p id="webVerdict" style="margin:0 0 12px;color:var(--muted);">Loading dashboard…</p>
+          <div id="connectBanner" class="connect-banner wait">
+            <span class="connect-dot"></span>
+            <div>
+              <strong id="connectTitle">Checking</strong>
+              <p id="connectDetail">Checking if uniqbd.com is connected.</p>
+            </div>
+          </div>
+          <p id="webVerdict" class="hidden" style="margin:0 0 12px;color:var(--muted);">Loading dashboard…</p>
           <ul id="webInfo" class="sec-list"></ul>
           <div class="field" style="margin-top:14px;">
             <label>Extension key</label>
@@ -655,7 +688,7 @@
               <a href="/arorashop-ff-extension.zip" download class="btn btn-primary btn-sm" style="text-decoration:none;">Download</a>
             </div>
           </div>
-          <pre id="uniqbdProbe" style="margin-top:12px;background:#06090d;border:1px solid var(--border);padding:12px;border-radius:10px;font-size:12px;overflow:auto;display:none;"></pre>
+          <pre id="uniqbdProbe" class="hidden" style="margin-top:12px;background:#06090d;border:1px solid var(--border);padding:12px;border-radius:10px;font-size:12px;overflow:auto;"></pre>
         </div>
         <div class="card" style="margin-bottom:14px;">
           <div class="card-head">
@@ -1153,16 +1186,35 @@
       return '৳' + amount.toFixed(2);
     }
 
+    let uniqbdChecked = false;
+
+    function setConnect(state, title, detail) {
+      const banner = document.getElementById('connectBanner');
+      const badge = document.getElementById('uniqbdLiveBadge');
+      if (banner) {
+        banner.className = 'connect-banner ' + state;
+        document.getElementById('connectTitle').textContent = title;
+        document.getElementById('connectDetail').textContent = detail;
+      }
+      if (!badge) return;
+      const color = state === 'ok' ? '#34d399' : state === 'bad' ? '#fb7185' : '#fbbf24';
+      const bg = state === 'ok' ? 'rgba(16,185,129,.14)' : state === 'bad' ? 'rgba(244,63,94,.16)' : 'rgba(245,183,55,.16)';
+      badge.style.background = bg;
+      badge.style.color = color;
+      badge.style.borderColor = color;
+      badge.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${color};display:inline-block;"></span> ${title === 'Connected' ? 'UniQbd Connected' : title === 'Not connected' ? 'UniQbd Not connected' : 'UniQbd Checking'}`;
+    }
+
     function renderWebsite(d) {
       const link = d.uniqbd || {};
       const online = Boolean(d.extension_status && d.extension_status.online);
       const readyCount = (link.packages || []).filter((row) => row.ready).length;
       const activeCount = (link.packages || []).filter((row) => row.active).length;
-      const verdict = document.getElementById('webVerdict');
-      if (verdict) {
-        verdict.textContent = link.connected
-          ? 'Connected to uniqbd.com'
-          : 'UniQbd link is not complete';
+      if (!link.connected) {
+        setConnect('bad', 'Not connected', 'API key or webhook is missing, so uniqbd.com is not connected.');
+      } else if (!uniqbdChecked) {
+        uniqbdChecked = true;
+        checkUniqbd();
       }
       document.getElementById('webInfo').innerHTML = `
         <li class="sec-row"><span>${ICONS.globe} This website</span><code>https://ff.uniqbd.com</code></li>
@@ -1229,16 +1281,12 @@
     }
 
     async function checkUniqbd() {
-      const box = document.getElementById('uniqbdProbe');
-      box.style.display = 'block';
-      box.textContent = 'Checking uniqbd.com…';
+      setConnect('wait', 'Checking', 'Checking if uniqbd.com is connected.');
       const result = await api('/admin-api/uniqbd-check', { method: 'POST' });
       if (result.route_live) {
-        box.textContent = 'UniQbd webhook is live. A finished order can be marked delivered.';
-      } else if (result.ok) {
-        box.textContent = 'UniQbd answered with HTTP ' + result.http_status + ', but the webhook route is not ready.';
+        setConnect('ok', 'Connected', 'uniqbd.com is connected to this website.');
       } else {
-        box.textContent = result.error || 'UniQbd check failed.';
+        setConnect('bad', 'Not connected', 'uniqbd.com is not connected right now.');
       }
     }
 
