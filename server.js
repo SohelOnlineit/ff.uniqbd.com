@@ -402,6 +402,7 @@ function ensureDeskColumns() {
     'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS arora_order_utr TEXT',
     'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS shop_order_number TEXT',
     'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS delivery_attempts INTEGER DEFAULT 0',
+    'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMP',
     'ALTER TABLE unipin_loaded_accounts ADD COLUMN IF NOT EXISTS security_pin_encrypted TEXT',
     'ALTER TABLE unipin_loaded_accounts ADD COLUMN IF NOT EXISTS masked_email TEXT',
     'ALTER TABLE unipin_loaded_accounts ADD COLUMN IF NOT EXISTS low_balance_threshold DOUBLE PRECISION DEFAULT 0',
@@ -681,11 +682,17 @@ function cipherIsCurrent(column) {
 }
 
 function markOrderInProgress(orderId, sets) {
+  const moving = `status = 'IN_PROGRESS_EXT', claimed_at = CURRENT_TIMESTAMP, ${sets}`;
   try {
-    pg(`UPDATE fulfillment_orders SET status = 'IN_PROGRESS_EXT', ${sets}, delivery_attempts = COALESCE(delivery_attempts, 0) + 1 WHERE id = ${Number(orderId)}`);
+    pg(`UPDATE fulfillment_orders SET ${moving}, delivery_attempts = COALESCE(delivery_attempts, 0) + 1 WHERE id = ${Number(orderId)}`);
   } catch (err) {
     console.error('claim progress:', dbError(err));
-    pg(`UPDATE fulfillment_orders SET status = 'IN_PROGRESS_EXT', ${sets} WHERE id = ${Number(orderId)}`);
+    try {
+      pg(`UPDATE fulfillment_orders SET ${moving} WHERE id = ${Number(orderId)}`);
+    } catch (err2) {
+      console.error('claim progress:', dbError(err2));
+      pg(`UPDATE fulfillment_orders SET status = 'IN_PROGRESS_EXT', ${sets} WHERE id = ${Number(orderId)}`);
+    }
   }
 }
 
@@ -708,6 +715,7 @@ function stopOverTriedOrders() {
 }
 
 function claimNextTask() {
+  cancelStuckProcessingOrders();
   stopOverTriedOrders();
   let order = null;
   try {
@@ -843,12 +851,26 @@ function cancelStuckProcessingOrders() {
   let rows = [];
   try {
     rows = pgJson(`SELECT status, arora_order_utr, shop_order_number, player_uid, package_name, status_reason, receipt_note
-      FROM fulfillment_orders WHERE status = 'PROCESSING'`);
+      FROM fulfillment_orders
+      WHERE status = 'PROCESSING'
+         OR (status = 'IN_PROGRESS_EXT' AND (claimed_at IS NULL OR claimed_at < CURRENT_TIMESTAMP - INTERVAL '4 minutes'))`);
   } catch (err) {
     console.error('cancel stuck orders:', dbError(err));
-    return;
+    try {
+      rows = pgJson(`SELECT status, arora_order_utr, shop_order_number, player_uid, package_name, status_reason, receipt_note
+        FROM fulfillment_orders WHERE status = 'PROCESSING'`);
+    } catch (err2) {
+      console.error('cancel stuck orders:', dbError(err2));
+      return;
+    }
   }
-  rows.forEach((row) => cancelUndeliveredOrder(row, row.status_reason, row.receipt_note));
+  rows.forEach((row) => {
+    try {
+      cancelUndeliveredOrder(row, row.status_reason, row.receipt_note);
+    } catch (err) {
+      console.error('cancel stuck orders:', dbError(err));
+    }
+  });
 }
 
 function finishExtensionOrder(body) {
@@ -1084,6 +1106,7 @@ function dashQuery(label, fn, fallback) {
 }
 
 function dashboard() {
+  cancelStuckProcessingOrders();
   const stats = dashQuery('stats', () => pgOne(`
     SELECT COUNT(*) AS total_orders,
            SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_orders,
@@ -1423,9 +1446,13 @@ try {
 server.listen(port, host, () => {
   try {
     shortenStoredOrderIds();
-    cancelStuckProcessingOrders();
   } catch (err) {
     console.error('Could not shorten old order ids');
+  }
+  try {
+    cancelStuckProcessingOrders();
+  } catch (err) {
+    console.error('cancel stuck orders:', dbError(err));
   }
   console.log('ff.uniqbd.com listening on http://' + host + ':' + port);
 });
