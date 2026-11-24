@@ -1724,11 +1724,40 @@
       ].join('');
     }
 
+    function whenDate(value) {
+      const raw = String(value || '').trim();
+      if (!raw) return null;
+      const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
+      const date = new Date(hasZone ? raw : raw.replace(' ', 'T') + 'Z');
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
     function whenText(value) {
-      if (!value) return '—';
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return esc(value);
-      return date.toLocaleString();
+      const date = whenDate(value);
+      if (!date) return value ? esc(value) : '—';
+      const minutes = Math.round((Date.now() - date.getTime()) / 60000);
+      const ahead = minutes < 0;
+      const span = Math.abs(minutes);
+      let text = 'just now';
+      if (span >= 1 && span < 60) text = span === 1 ? '1 minute' : span + ' minutes';
+      else if (span >= 60 && span < 24 * 60) {
+        const hours = Math.max(1, Math.round(span / 60));
+        text = hours === 1 ? '1 hour' : hours + ' hours';
+      } else if (span >= 24 * 60 && span < 7 * 24 * 60) {
+        const days = Math.max(1, Math.round(span / (24 * 60)));
+        text = days === 1 ? '1 day' : days + ' days';
+      } else if (span >= 7 * 24 * 60 && span < 30 * 24 * 60) {
+        const weeks = Math.round(span / (7 * 24 * 60));
+        text = weeks === 1 ? '1 week' : weeks + ' weeks';
+      } else if (span >= 30 * 24 * 60 && span < 365 * 24 * 60) {
+        const months = Math.max(1, Math.round(span / (30 * 24 * 60)));
+        text = months === 1 ? '1 month' : months + ' months';
+      } else if (span >= 365 * 24 * 60) {
+        const years = Math.max(1, Math.round(span / (365 * 24 * 60)));
+        text = years === 1 ? '1 year' : years + ' years';
+      }
+      if (text !== 'just now') text = ahead ? 'in ' + text : text + ' ago';
+      return `<span title="${esc(date.toLocaleString())}">${esc(text)}</span>`;
     }
 
     function pill(ok, yes, no) {
