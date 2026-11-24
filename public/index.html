@@ -203,6 +203,72 @@
       display: inline-block;
     }
     .topbar-actions { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+    .head-menu { position: relative; }
+    .head-dots {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 38px;
+      height: 38px;
+      border: 1px solid rgba(38, 191, 176, 0.28);
+      border-radius: 12px;
+      background: #021820;
+      color: #d7e7ea;
+      cursor: pointer;
+    }
+    .head-dots .ico { fill: currentColor; stroke: none; }
+    .head-dots:hover, .head-dots[aria-expanded="true"] {
+      border-color: #26bfb0;
+      color: #f8fafc;
+      background: rgba(38, 191, 176, 0.12);
+    }
+    .head-pop {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      z-index: 50;
+      width: min(240px, calc(100vw - 24px));
+      padding: 6px;
+      border: 1px solid rgba(38, 191, 176, 0.28);
+      border-radius: 14px;
+      background: #031a22;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.38);
+    }
+    .head-pop[hidden] { display: none; }
+    .head-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      min-height: 40px;
+      padding: 5px 7px;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: #d7e7ea;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 650;
+      text-align: left;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .head-item:hover { background: rgba(38, 191, 176, 0.1); color: #f8fafc; }
+    .head-ico {
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      flex: 0 0 auto;
+      border-radius: 9px;
+      color: #5eead4;
+      background: rgba(38, 191, 176, 0.14);
+    }
+    .head-ico .ico { width: 16px; height: 16px; padding: 0; border: 0; background: transparent; }
+    .head-line { height: 1px; margin: 5px 8px; background: #12343c; }
+    .head-item-danger { color: #fb7185; }
+    .head-item-danger .head-ico { color: #fb7185; background: rgba(251, 113, 133, 0.12); }
+    .head-item-danger:hover { background: rgba(251, 113, 133, 0.1); color: #fda4af; }
     .app-shell > div { min-width: 0; }
     #extLiveBadge { max-width: 100%; }
 
@@ -935,16 +1001,30 @@
             <span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
             Extension Offline
           </span>
-          <a href="/docs" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none;" title="Public API & Webhook Documentation">Docs</a>
-          <a href="/admin" class="btn btn-primary btn-sm" style="text-decoration:none;" title="Manage API Resellers & Users">Admin</a>
-          <button class="btn btn-secondary btn-sm" onclick="loadDashboard()" title="Refresh">
-            <svg class="ico ico-sm" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-            <span class="btn-label-hide">Refresh</span>
-          </button>
-          <button class="btn btn-danger btn-sm" onclick="logout()" title="Logout">
-            <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-            <span class="btn-label-hide">Logout</span>
-          </button>
+          <div class="head-menu" id="headMenu">
+            <button type="button" class="head-dots" id="headDots" aria-label="Menu" aria-haspopup="menu" aria-expanded="false">
+              <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.6" fill="currentColor" stroke="none"/></svg>
+            </button>
+            <div class="head-pop" id="headPop" role="menu" hidden>
+              <a class="head-item" href="/docs" target="_blank" role="menuitem">
+                <span class="head-ico"><svg class="ico" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+                Docs
+              </a>
+              <a class="head-item" href="/admin" role="menuitem">
+                <span class="head-ico"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span>
+                Admin
+              </a>
+              <button type="button" class="head-item" role="menuitem" onclick="loadDashboard(); setHeadMenu(false)">
+                <span class="head-ico"><svg class="ico" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></span>
+                Refresh
+              </button>
+              <div class="head-line"></div>
+              <button type="button" class="head-item head-item-danger" role="menuitem" onclick="logout()">
+                <span class="head-ico"><svg class="ico" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
+                Logout
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </header>
@@ -1534,13 +1614,34 @@
       document.body.style.overflow = show ? 'hidden' : '';
     }
 
+    function setHeadMenu(open) {
+      const pop = document.getElementById('headPop');
+      const btn = document.getElementById('headDots');
+      if (!pop || !btn) return;
+      pop.hidden = !open;
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    document.getElementById('headDots').addEventListener('click', (event) => {
+      event.stopPropagation();
+      setHeadMenu(document.getElementById('headPop').hidden);
+    });
+    document.addEventListener('click', (event) => {
+      const menu = document.getElementById('headMenu');
+      if (menu && !menu.contains(event.target)) setHeadMenu(false);
+    });
+
     document.getElementById('navToggle').addEventListener('click', () => {
+      setHeadMenu(false);
       setNavOpen(!document.body.classList.contains('nav-open'));
     });
     document.getElementById('navBack').addEventListener('click', () => setNavOpen(false));
     document.getElementById('navClose').addEventListener('click', () => setNavOpen(false));
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') setNavOpen(false);
+      if (event.key === 'Escape') {
+        setNavOpen(false);
+        setHeadMenu(false);
+      }
     });
     window.addEventListener('resize', () => {
       if (window.innerWidth > 960) setNavOpen(false);
