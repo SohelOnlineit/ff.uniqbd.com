@@ -146,6 +146,21 @@
     .btn-danger { background: rgba(228, 0, 20, 0.08); color: var(--danger); border: 1px solid rgba(228, 0, 20, 0.28); }
     .btn-danger:hover { background: rgba(228, 0, 20, 0.14); }
     .btn-sm { padding: 7px 11px; font-size: 12px; border-radius: 8px; }
+    .tok-eye {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      margin-left: 6px;
+      border-radius: 8px;
+      border: 1px solid rgba(38, 191, 176, 0.45);
+      background: rgba(38, 191, 176, 0.12);
+      color: #5eead4;
+      cursor: pointer;
+      vertical-align: middle;
+    }
+    .tok-eye:hover { color: #5eead4; border-color: var(--accent); }
     .w-full { width: 100%; }
 
     /* Topbar */
@@ -1152,6 +1167,8 @@
       trash: '<svg class="ico ico-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
       pause: '<svg class="ico ico-sm" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>',
       play: '<svg class="ico ico-sm" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
+      eye: '<svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>',
+      eyeOff: '<svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>',
     };
 
     function showToast(msg) {
@@ -1556,8 +1573,8 @@
         ? '<tr><td colspan="5" style="color:var(--muted);">No tokens in stock.</td></tr>'
         : r.vouchers.map((v) => `
           <tr>
-            <td><code>${v.package_code}</code></td>
-            <td><code>${v.masked_code}</code></td>
+            <td><code>${esc(v.package_code)}</code></td>
+            <td><code id="tok-${v.id}">${esc(v.masked_code)}</code><button type="button" class="tok-eye" onclick="toggleToken(${v.id}, this)" title="Show token">${ICONS.eye}</button></td>
             <td><span class="pill ${v.status === 'available' ? 'pill-green' : 'pill-blue'}">${v.status === 'available' ? 'Available' : 'Used'}</span></td>
             <td>${v.used_order_utr ? `<code>${v.used_order_utr}</code>` : '-'}</td>
             <td>${v.status === 'available' ? `<button class="btn btn-danger btn-sm" onclick="delVoucher(${v.id})">${ICONS.trash}</button>` : '-'}</td>
@@ -1593,6 +1610,33 @@
         loadVouchers();
       }
     });
+
+    const shownTokens = {};
+
+    async function toggleToken(id, btn) {
+      const el = document.getElementById('tok-' + id);
+      if (!el) return;
+      if (el.dataset.open === '1') {
+        el.textContent = el.dataset.mask || '';
+        el.dataset.open = '0';
+        btn.innerHTML = ICONS.eye;
+        btn.title = 'Show token';
+        return;
+      }
+      if (!shownTokens[id]) {
+        const r = await api('/admin-api/vouchers/' + id);
+        if (!r.ok || !r.code) {
+          showToast(r.error || 'Could not show this token.');
+          return;
+        }
+        shownTokens[id] = r.code;
+      }
+      if (!el.dataset.mask) el.dataset.mask = el.textContent;
+      el.textContent = shownTokens[id];
+      el.dataset.open = '1';
+      btn.innerHTML = ICONS.eyeOff;
+      btn.title = 'Hide token';
+    }
 
     async function delVoucher(id) {
       if (!confirm('Delete this token?')) return;

@@ -1428,6 +1428,19 @@ const server = http.createServer(async (req, res) => {
   }
 
   const voucherMatch = pathname.match(/^\/admin-api\/vouchers\/(\d+)$/);
+  if (voucherMatch && req.method === 'GET') {
+    if (!readToken(req)) return sendJson(res, 401, { ok: false });
+    try {
+      const row = pgOne(`SELECT code_encrypted FROM unipin_vouchers WHERE id = ${Number(voucherMatch[1])} LIMIT 1`);
+      if (!row) return sendJson(res, 404, { ok: false, error: 'Token not found' });
+      const code = decryptSecret(row.code_encrypted);
+      if (!code) return sendJson(res, 400, { ok: false, error: 'This token cannot be shown.' });
+      return sendJson(res, 200, { ok: true, code });
+    } catch (err) {
+      console.error('show token failed:', dbError(err));
+      return sendJson(res, 500, { ok: false });
+    }
+  }
   if (voucherMatch && req.method === 'DELETE') {
     if (!readToken(req)) return sendJson(res, 401, { ok: false });
     const removed = pg('DELETE FROM unipin_vouchers WHERE id = ' + Number(voucherMatch[1]) + " AND lower(status) = 'available' RETURNING id");
