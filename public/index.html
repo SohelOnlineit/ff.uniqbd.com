@@ -549,6 +549,10 @@
           <svg class="ico ico-sm" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
           Accounts
         </button>
+        <button class="tab-btn" onclick="switchTab('settings', this)">
+          <svg class="ico ico-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Settings
+        </button>
       </nav>
     </aside>
     <div>
@@ -901,6 +905,38 @@
           </div>
         </div>
       </section>
+
+      <section id="tab-settings" class="tab-pane hidden">
+        <div class="card" style="max-width:560px;">
+          <div class="card-head">
+            <div class="card-title">
+              <svg class="ico" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Security
+            </div>
+            <span class="card-sub">Same idea as AmarPin account security</span>
+          </div>
+          <form id="securityForm">
+            <div class="field">
+              <label for="secUser">Username</label>
+              <input type="text" id="secUser" readonly />
+            </div>
+            <div class="field">
+              <label for="secCurrent">Current password</label>
+              <input type="password" id="secCurrent" required autocomplete="current-password" />
+            </div>
+            <div class="field">
+              <label for="secNext">New password</label>
+              <input type="password" id="secNext" required minlength="8" maxlength="128" autocomplete="new-password" />
+            </div>
+            <div class="field">
+              <label for="secConfirm">Confirm new password</label>
+              <input type="password" id="secConfirm" required minlength="8" maxlength="128" autocomplete="new-password" />
+            </div>
+            <p id="secErr" style="color:#fb7185;font-size:12px;margin:0 0 10px;"></p>
+            <button type="submit" class="btn btn-primary">Update password</button>
+          </form>
+        </div>
+      </section>
     </main>
     </div>
     </div>
@@ -942,7 +978,7 @@
         const matchBtn = document.querySelector(`.tab-btn[onclick*="'${name}'"]`);
         if (matchBtn) matchBtn.classList.add('active');
       }
-      const titles = { website: 'Dashboard', orders: 'Orders', vouchers: 'Tokens', accounts: 'Accounts' };
+      const titles = { website: 'Dashboard', orders: 'Orders', vouchers: 'Tokens', accounts: 'Accounts', settings: 'Settings' };
       const title = document.querySelector('.topbar-title');
       if (title) title.textContent = titles[name] || 'Overview';
       localStorage.setItem('arora_active_tab', name);
@@ -987,8 +1023,10 @@
         document.getElementById('loginView').classList.add('hidden');
         document.getElementById('appView').classList.remove('hidden');
         const savedTab = localStorage.getItem('arora_active_tab') || 'website';
-        const lastTab = ['website', 'orders', 'vouchers', 'accounts'].includes(savedTab) ? savedTab : 'website';
+        const lastTab = ['website', 'orders', 'vouchers', 'accounts', 'settings'].includes(savedTab) ? savedTab : 'website';
         switchTab(lastTab, null);
+        const secUser = document.getElementById('secUser');
+        if (secUser) secUser.value = me.username || '';
         loadDashboard();
       } else {
         localStorage.removeItem('arora_admin_token');
@@ -1479,6 +1517,35 @@
       const app = document.getElementById('appView');
       if (app && !app.classList.contains('hidden')) loadDashboard();
     }, 15000);
+
+    document.getElementById('securityForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('secErr');
+      const userBox = document.getElementById('secUser');
+      err.textContent = '';
+      const next = document.getElementById('secNext').value;
+      const confirm = document.getElementById('secConfirm').value;
+      if (next !== confirm) {
+        err.textContent = 'New passwords do not match.';
+        return;
+      }
+      const r = await api('/admin-api/password', {
+        method: 'POST',
+        body: JSON.stringify({
+          current_password: document.getElementById('secCurrent').value,
+          new_password: next,
+          confirm_password: confirm,
+        }),
+      });
+      if (r.ok) {
+        const name = userBox.value;
+        document.getElementById('securityForm').reset();
+        userBox.value = name;
+        showToast('Password updated.');
+      } else {
+        err.textContent = r.error || 'Could not update the password.';
+      }
+    });
 
     checkAuth();
   </script>

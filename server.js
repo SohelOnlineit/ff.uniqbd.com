@@ -215,6 +215,22 @@ function verifyPassword(password, stored) {
   return crypto.timingSafeEqual(actual, expected);
 }
 
+function changeAdminPassword(username, body) {
+  const current = String(body.current_password || '').trim();
+  const next = String(body.new_password || '').trim();
+  const confirm = String(body.confirm_password || '').trim();
+  if (!current || !next) return { status: 400, body: { ok: false, error: 'Enter the current and new password.' } };
+  if (next.length < 8 || next.length > 128) return { status: 400, body: { ok: false, error: 'New password must be 8 to 128 characters.' } };
+  if (next !== confirm) return { status: 400, body: { ok: false, error: 'New passwords do not match.' } };
+  if (next === current) return { status: 400, body: { ok: false, error: 'Choose a different password.' } };
+  const row = pgOne(`SELECT username, password_hash FROM admins WHERE username = ${sqlString(username)} LIMIT 1`);
+  if (!row || !verifyPassword(current, row.password_hash)) {
+    return { status: 400, body: { ok: false, error: 'Current password is wrong.' } };
+  }
+  pg(`UPDATE admins SET password_hash = ${sqlString(hashPassword(next))} WHERE username = ${sqlString(username)}`);
+  return { status: 200, body: { ok: true } };
+}
+
 function signToken(username) {
   const body = Buffer.from(JSON.stringify({
     u: username,
@@ -830,6 +846,18 @@ const server = http.createServer(async (req, res) => {
     const username = readToken(req);
     if (!username) return sendJson(res, 401, { ok: false });
     return sendJson(res, 200, { ok: true, username });
+  }
+
+  if (pathname === '/admin-api/password' && req.method === 'POST') {
+    const username = readToken(req);
+    if (!username) return sendJson(res, 401, { ok: false });
+    try {
+      const result = changeAdminPassword(username, JSON.parse(await readBody(req) || '{}'));
+      return sendJson(res, result.status, result.body);
+    } catch (err) {
+      console.error('password change failed:', dbError(err));
+      return sendJson(res, 500, { ok: false, error: 'Could not update the password.' });
+    }
   }
 
   if (pathname === '/admin-api/logout' && req.method === 'POST') {
