@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <link rel="icon" type="image/webp" href="/favicon.webp" />
   <meta name="robots" content="noindex, nofollow" />
   <title>FF.UniQbd</title>
@@ -807,7 +807,14 @@
         color: var(--nav-tone, #26bfb0);
       }
       .tab-btn.active::before { content: none; }
-      .topbar-phone { display: block; padding: 4px 12px; }
+      .topbar-phone {
+        display: block;
+        padding:
+          calc(4px + env(safe-area-inset-top))
+          calc(12px + env(safe-area-inset-right))
+          4px
+          calc(12px + env(safe-area-inset-left));
+      }
       .topbar-phone .topbar-inner { min-height: 40px; gap: 6px; }
       .topbar-phone .topbar-badges { display: none; }
       .topbar-phone .topbar-meta { display: none; }
@@ -845,7 +852,7 @@
       body { overflow-x: clip; }
       .app-shell { padding: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
       .container { padding: 0; }
-      .topbar-phone { padding: 4px 12px; border-radius: 0; }
+      .topbar-phone { border-radius: 0; }
       .btn-label-hide { display: none; }
       .tabs { display: flex; flex-direction: column; }
       .tab-btn { width: 100%; font-size: 15px; padding: 6px 8px; }
@@ -990,11 +997,11 @@
         </a>
         <div class="topbar-right">
           <div class="head-menu" id="headMenu">
-            <button type="button" class="round-btn" id="headProfile" title="Account" aria-label="Account" aria-haspopup="menu" aria-expanded="false">
+            <button type="button" class="round-btn" id="headProfile" title="Account" aria-label="Account" aria-haspopup="menu" aria-controls="headPop" aria-expanded="false">
               <svg class="ico" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             </button>
             <div class="head-pop" id="headPop" role="menu" hidden>
-              <a class="head-item" href="/docs" target="_blank" role="menuitem">
+              <a class="head-item" href="/docs" target="_blank" rel="noopener noreferrer" role="menuitem">
                 <span class="head-ico"><svg class="ico" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
                 Docs
               </a>
@@ -1087,13 +1094,13 @@
             <span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
             Extension Offline
           </span>
-          <a href="/docs" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none;" title="Public API & Webhook Documentation">Docs</a>
+          <a href="/docs" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="text-decoration:none;" title="Public API & Webhook Documentation">Docs</a>
           <a href="/admin" class="btn btn-primary btn-sm" style="text-decoration:none;" title="Manage API Resellers & Users">Admin</a>
-          <button class="btn btn-secondary btn-sm" onclick="loadDashboard()" title="Refresh">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="loadDashboard()" title="Refresh">
             <svg class="ico ico-sm" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
             <span class="btn-label-hide">Refresh</span>
           </button>
-          <button class="btn btn-danger btn-sm" onclick="logout()" title="Logout">
+          <button type="button" class="btn btn-danger btn-sm" onclick="logout()" title="Logout">
             <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             <span class="btn-label-hide">Logout</span>
           </button>
@@ -1704,14 +1711,17 @@
       const pop = document.getElementById('headPop');
       const btn = document.getElementById('headProfile');
       if (!pop || !btn) return;
+      const wasOpen = !pop.hidden;
       pop.hidden = !open;
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (!open && wasOpen && pop.contains(document.activeElement)) btn.focus();
     }
 
     document.getElementById('headProfile').addEventListener('click', (event) => {
       event.stopPropagation();
       setHeadMenu(document.getElementById('headPop').hidden);
     });
+    document.getElementById('headPop').addEventListener('click', () => setHeadMenu(false));
     document.addEventListener('click', (event) => {
       const menu = document.getElementById('headMenu');
       if (menu && !menu.contains(event.target)) setHeadMenu(false);
@@ -1730,7 +1740,10 @@
       }
     });
     window.addEventListener('resize', () => {
-      if (window.innerWidth > 960) setNavOpen(false);
+      if (window.innerWidth > 960) {
+        setNavOpen(false);
+        setHeadMenu(false);
+      }
     });
 
     function maskSecret(value) {
