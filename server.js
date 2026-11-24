@@ -505,6 +505,118 @@ function seenOnline(ts) {
   return Date.now() - ms < 120000;
 }
 
+function flagOn(value) {
+  return value === true || value === 't' || value === 'true' || Number(value) === 1;
+}
+
+function uniqbdLink() {
+  const expectedWebhook = 'https://uniqbd.com/api/ff-webhook';
+  const reseller = pgOne(`
+    SELECT is_active, webhook_url,
+           (api_key IS NOT NULL AND length(api_key) > 10) AS api_key_saved,
+           (api_secret IS NOT NULL AND length(api_secret) > 10) AS api_secret_saved
+    FROM resellers
+    ORDER BY id
+    LIMIT 1
+  `) || {};
+  const packages = pgJson(`
+    SELECT p.package_code, p.name, p.diamonds, p.unipin_uc_cost, p.is_active,
+           (SELECT COUNT(*) FROM unipin_vouchers v
+             WHERE v.package_code = p.package_code AND lower(v.status) = 'available'
+               AND v.code_encrypted LIKE 'aes256gcm$%') AS ready_tokens,
+           (SELECT COUNT(*) FROM unipin_loaded_accounts a
+             WHERE lower(a.status) = 'active'
+               AND a.credentials_encrypted LIKE 'aes256gcm$%'
+               AND a.balance >= p.unipin_uc_cost) AS ready_accounts
+    FROM ff_packages p
+    ORDER BY p.id
+  `);
+  const oldAccounts = pgOne("SELECT COUNT(*) AS n FROM unipin_loaded_accounts WHERE credentials_encrypted NOT LIKE 'aes256gcm$%'") || {};
+  const orders = pgJson(`
+    SELECT reseller_order_id, player_uid, package_code, package_name, status, webhook_status, method_used, created_at
+    FROM fulfillment_orders
+    WHERE reseller_order_id IS NOT NULL AND length(reseller_order_id) > 0
+    ORDER BY id DESC
+    LIMIT 15
+  `);
+  const webhookUrl = String(reseller.webhook_url || '');
+  const apiReady = flagOn(reseller.api_key_saved) && flagOn(reseller.api_secret_saved) && flagOn(reseller.is_active);
+  const webhookReady = webhookUrl === expectedWebhook;
+  return {
+    shop: 'uniqbd.com',
+    api_url: 'https://ff.uniqbd.com/api/reseller/v1/order',
+    webhook_url: webhookUrl,
+    webhook_expected: expectedWebhook,
+    api_key_saved: flagOn(reseller.api_key_saved),
+    api_secret_saved: flagOn(reseller.api_secret_saved),
+    reseller_active: flagOn(reseller.is_active),
+    api_ready: apiReady,
+    webhook_ready: webhookReady,
+    connected: apiReady && webhookReady,
+    old_accounts: num(oldAccounts.n),
+    packages: packages.map((row) => ({
+      package_code: row.package_code,
+      name: row.name,
+      diamonds: num(row.diamonds),
+      uniqbd_name: row.package_code === 'FF_WEEKLY'
+        ? 'Weekly Membership'
+        : row.package_code === 'FF_MONTHLY'
+          ? 'Monthly Membership'
+          : num(row.diamonds) + ' Diamond',
+      ready_tokens: num(row.ready_tokens),
+      ready_accounts: num(row.ready_accounts),
+      active: flagOn(row.is_active),
+      ready: flagOn(row.is_active) && (num(row.ready_tokens) > 0 || num(row.ready_accounts) > 0),
+    })),
+    orders: orders.map((row) => ({
+      reseller_order_id: row.reseller_order_id,
+      uniqbd_order_id: String(row.reseller_order_id || '').split('#')[0].split(':')[0],
+      player_uid: row.player_uid,
+      package_code: row.package_code,
+      package_name: row.package_name,
+      status: row.status,
+      webhook_status: row.webhook_status || '',
+      method_used: row.method_used || '',
+      created_at: row.created_at || '',
+    })),
+  };
+}
+
+async function probeUniqbdWebhook() {
+  const link = uniqbdLink();
+  if (!link.webhook_ready) {
+    return { ok: false, error: 'Webhook is not set to https://uniqbd.com/api/ff-webhook' };
+  }
+  try {
+    const response = await fetch(link.webhook_expected, {
+      method: 'POST',
+      redirect: 'manual',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Arora-Event': 'order.completed',
+        'X-Arora-Timestamp': '0',
+        'X-Arora-Signature': '00',
+      },
+      body: '{}',
+      signal: AbortSignal.timeout(8000),
+    });
+    let rejected = false;
+    try {
+      const parsed = await response.json();
+      rejected = Boolean(parsed && parsed.ok === false);
+    } catch {
+      rejected = false;
+    }
+    return {
+      ok: true,
+      http_status: response.status,
+      route_live: response.status === 200 && rejected,
+    };
+  } catch {
+    return { ok: false, error: 'UniQbd did not answer' };
+  }
+}
+
 function dashboard() {
   const stats = pgOne(`
     SELECT COUNT(*) AS total_orders,
@@ -564,6 +676,7 @@ function dashboard() {
       allowed_ips: reseller.allowed_ips || '127.0.0.1',
       telegram_connected: Boolean(reseller.telegram_connected),
     },
+    uniqbd: uniqbdLink(),
   };
 }
 
@@ -696,6 +809,16 @@ const server = http.createServer(async (req, res) => {
     } catch (err) {
       console.error('reseller order failed:', dbError(err));
       return sendJson(res, 500, { ok: false, error: 'Order API failed' });
+    }
+  }
+
+  if (pathname === '/admin-api/uniqbd-check' && req.method === 'POST') {
+    if (!readToken(req)) return sendJson(res, 401, { ok: false });
+    try {
+      return sendJson(res, 200, await probeUniqbdWebhook());
+    } catch (err) {
+      console.error('uniqbd check failed:', dbError(err));
+      return sendJson(res, 500, { ok: false, error: 'UniQbd check failed' });
     }
   }
 
