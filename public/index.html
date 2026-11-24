@@ -226,6 +226,22 @@
       display: inline-block;
     }
     .topbar-badges { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+    .topbar-phone { display: none; }
+    .topbar-desk {
+      background: rgba(4, 27, 35, 0.92);
+      border: 1px solid rgba(0, 186, 199, 0.28);
+      border-radius: 18px;
+      padding: 12px 14px;
+      margin: 0 0 14px;
+      backdrop-filter: blur(8px);
+    }
+    .topbar-desk .topbar-inner {
+      display: flex;
+      min-height: 0;
+      justify-content: space-between;
+    }
+    .topbar-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .topbar-actions { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
     .head-menu { position: relative; }
     .head-dots .ico { fill: currentColor; stroke: none; }
     .head-pop {
@@ -790,7 +806,8 @@
         color: var(--nav-tone, #26bfb0);
       }
       .tab-btn.active::before { content: none; }
-      .topbar { padding: 8px 10px; }
+      .topbar-phone { display: block; padding: 8px 10px; }
+      .topbar-desk { display: none; }
       .round-btn { width: 36px; height: 36px; }
       .topbar-logo img { height: 32px; }
       .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -806,7 +823,7 @@
       body { overflow-x: clip; }
       .app-shell { padding: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
       .container { padding: 0; }
-      .topbar { padding: 8px 10px 10px; border-radius: 0; }
+      .topbar-phone { padding: 8px 10px 10px; border-radius: 0; }
       .btn-label-hide { display: none; }
       .tabs { display: flex; flex-direction: column; }
       .tab-btn { width: 100%; font-size: 15px; padding: 6px 8px; }
@@ -938,7 +955,7 @@
   <!-- DASHBOARD VIEW -->
   <div id="appView" class="hidden">
     <button type="button" class="nav-back" id="navBack" aria-label="Close menu"></button>
-    <header class="topbar">
+    <header class="topbar topbar-phone">
       <div class="topbar-inner">
         <div class="topbar-left">
           <button type="button" class="round-btn nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false">
@@ -990,11 +1007,11 @@
           <div class="topbar-status"><span class="dot-live"></span> Secure Engine</div>
         </div>
         <div class="topbar-badges">
-          <span id="uniqbdLiveBadge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:700;background:rgba(245,183,55,.16);color:#fbbf24;border:1px solid rgba(245,183,55,.4);">
+          <span id="uniqbdLiveBadge" class="js-uniqbd-badge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:700;background:rgba(245,183,55,.16);color:#fbbf24;border:1px solid rgba(245,183,55,.4);">
             <span style="width:8px;height:8px;border-radius:50%;background:#fbbf24;display:inline-block;"></span>
             UniQbd Checking
           </span>
-          <span id="extLiveBadge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:700;background:rgba(244,63,94,.16);color:#fb7185;border:1px solid rgba(244,63,94,.35);">
+          <span id="extLiveBadge" class="js-ext-badge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:700;background:rgba(244,63,94,.16);color:#fb7185;border:1px solid rgba(244,63,94,.35);">
             <span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
             Extension Offline
           </span>
@@ -1039,6 +1056,36 @@
       </nav>
     </aside>
     <div>
+    <header class="topbar topbar-desk">
+      <div class="topbar-inner">
+        <div class="topbar-brand">
+          <div>
+            <div class="topbar-title">Dashboard</div>
+            <div class="topbar-status"><span class="dot-live"></span> Secure Engine</div>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span class="js-uniqbd-badge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:700;background:rgba(245,183,55,.16);color:#fbbf24;border:1px solid rgba(245,183,55,.4);">
+            <span style="width:8px;height:8px;border-radius:50%;background:#fbbf24;display:inline-block;"></span>
+            UniQbd Checking
+          </span>
+          <span class="js-ext-badge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:700;background:rgba(244,63,94,.16);color:#fb7185;border:1px solid rgba(244,63,94,.35);">
+            <span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
+            Extension Offline
+          </span>
+          <a href="/docs" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none;" title="Public API & Webhook Documentation">Docs</a>
+          <a href="/admin" class="btn btn-primary btn-sm" style="text-decoration:none;" title="Manage API Resellers & Users">Admin</a>
+          <button class="btn btn-secondary btn-sm" onclick="loadDashboard()" title="Refresh">
+            <svg class="ico ico-sm" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            <span class="btn-label-hide">Refresh</span>
+          </button>
+          <button class="btn btn-danger btn-sm" onclick="logout()" title="Logout">
+            <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span class="btn-label-hide">Logout</span>
+          </button>
+        </div>
+      </div>
+    </header>
     <main class="container">
       <section id="tab-website" class="tab-pane">
         <section class="stats-grid">
@@ -1606,8 +1653,9 @@
         if (matchBtn) matchBtn.classList.add('active');
       }
       const titles = { website: 'Dashboard', orders: 'Orders', vouchers: 'Tokens', accounts: 'Accounts', settings: 'Settings' };
-      const title = document.querySelector('.topbar-title');
-      if (title) title.textContent = titles[name] || 'Overview';
+      document.querySelectorAll('.topbar-title').forEach((title) => {
+        title.textContent = titles[name] || 'Overview';
+      });
       localStorage.setItem('arora_active_tab', name);
       setNavOpen(false);
       if (name === 'vouchers') loadVouchers();
@@ -1971,24 +2019,26 @@
       if (sig === dashSig) return;
       dashSig = sig;
 
-      const extBadge = document.getElementById('extLiveBadge');
-      if (extBadge && d.extension_status) {
+      const extBadges = document.querySelectorAll('.js-ext-badge');
+      if (extBadges.length && d.extension_status) {
         const isOnline = Boolean(d.extension_status.online);
         const ago = d.extension_status.last_seen_at
           ? Math.max(0, Math.floor((Date.now() - Number(d.extension_status.last_seen_at)) / 1000))
           : null;
-        if (isOnline) {
-          extBadge.style.background = 'rgba(16,185,129,.14)';
-          extBadge.style.color = '#34d399';
-          extBadge.style.borderColor = 'rgba(16,185,129,.4)';
-          extBadge.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;box-shadow:0 0 8px #10b981;"></span> Extension Online (${ago !== null ? ago + 's ago' : 'Live'})`;
-        } else {
-          extBadge.style.background = 'rgba(228,0,20,.1)';
-          extBadge.style.color = '#fb7185';
-          extBadge.style.borderColor = 'rgba(228,0,20,.28)';
-          const lastTxt = ago !== null ? (ago > 3600 ? Math.floor(ago/3600) + 'h ago' : Math.floor(ago/60) + 'm ago') : 'Never';
-          extBadge.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;"></span> Extension Offline (${lastTxt})`;
-        }
+        extBadges.forEach((extBadge) => {
+          if (isOnline) {
+            extBadge.style.background = 'rgba(16,185,129,.14)';
+            extBadge.style.color = '#34d399';
+            extBadge.style.borderColor = 'rgba(16,185,129,.4)';
+            extBadge.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;box-shadow:0 0 8px #10b981;"></span> Extension Online (${ago !== null ? ago + 's ago' : 'Live'})`;
+          } else {
+            extBadge.style.background = 'rgba(228,0,20,.1)';
+            extBadge.style.color = '#fb7185';
+            extBadge.style.borderColor = 'rgba(228,0,20,.28)';
+            const lastTxt = ago !== null ? (ago > 3600 ? Math.floor(ago/3600) + 'h ago' : Math.floor(ago/60) + 'm ago') : 'Never';
+            extBadge.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;"></span> Extension Offline (${lastTxt})`;
+          }
+        });
       }
 
       fillTelegram(d.security_info);
@@ -2055,19 +2105,20 @@
 
     function setConnect(state, title, detail) {
       const banner = document.getElementById('connectBanner');
-      const badge = document.getElementById('uniqbdLiveBadge');
       if (banner) {
         banner.className = 'connect-banner ' + state;
         document.getElementById('connectTitle').textContent = title;
         document.getElementById('connectDetail').textContent = detail;
       }
-      if (!badge) return;
       const color = state === 'ok' ? '#34d399' : state === 'bad' ? '#fb7185' : '#fbbf24';
       const bg = state === 'ok' ? 'rgba(16,185,129,.14)' : state === 'bad' ? 'rgba(244,63,94,.16)' : 'rgba(245,183,55,.16)';
-      badge.style.background = bg;
-      badge.style.color = color;
-      badge.style.borderColor = color;
-      badge.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${color};display:inline-block;"></span> ${title === 'Connected' ? 'UniQbd Connected' : title === 'Not connected' ? 'UniQbd Not connected' : 'UniQbd Checking'}`;
+      const label = title === 'Connected' ? 'UniQbd Connected' : title === 'Not connected' ? 'UniQbd Not connected' : 'UniQbd Checking';
+      document.querySelectorAll('.js-uniqbd-badge').forEach((badge) => {
+        badge.style.background = bg;
+        badge.style.color = color;
+        badge.style.borderColor = color;
+        badge.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${color};display:inline-block;"></span> ${label}`;
+      });
     }
 
     function renderWebsite(d) {
