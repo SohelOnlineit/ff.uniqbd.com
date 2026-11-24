@@ -101,6 +101,22 @@ function isDeliveryTab(url) {
   }
 }
 
+async function closeDeliveryTabs(keepTabId) {
+  const tabs = await chrome.tabs.query({
+    url: ['https://shop.garena.my/*', 'https://unipin.com/*', 'https://*.unipin.com/*'],
+  });
+  for (const tab of tabs) {
+    if (tab.id === keepTabId) continue;
+    try {
+      const inWindow = await chrome.tabs.query({ windowId: tab.windowId });
+      if (inWindow.filter((item) => item.id !== tab.id).length === 0) {
+        await chrome.tabs.create({ windowId: tab.windowId, url: 'about:blank', active: false });
+      }
+      await chrome.tabs.remove(tab.id);
+    } catch (_) {}
+  }
+}
+
 async function closeFulfillmentTab(tabId) {
   if (!tabId) return;
   try {
@@ -196,6 +212,7 @@ async function pollNextOrderNow(force = false) {
     return { ok: true, connected: true, skipped: true };
   }
 
+  let picked = null;
   try {
     const res = await fetch(`${st.apiBase}/ext-api/next-order`, {
       method: 'GET',
@@ -221,33 +238,38 @@ async function pollNextOrderNow(force = false) {
       startedAt: Date.now(),
     };
 
+    picked = task;
+    const freshUrl = `${GARENA_SHOP_URL}&start=${task.startedAt}`;
+    // Hide the task until the old shop tabs are gone, so a leftover success page cannot complete it.
+    await chrome.storage.local.set({ activeTask: null, activeTabId: null });
+    await clearShopCookies();
+    const targetTab = await chrome.tabs.create({ url: freshUrl, active: true });
+    await closeDeliveryTabs(targetTab && targetTab.id);
     await chrome.storage.local.set({
       activeTask: task,
-      lastLog: `Picked Order ${shownOrder(task)} (${task.package_name})`,
-    });
-
-    // Always clear previous Garena Shop session cookies before starting a fresh UID order
-    await clearShopCookies();
-
-    // Open or reuse Garena Shop / UniPin tab
-    const tabs = await chrome.tabs.query({
-      url: ['https://shop.garena.my/*', 'https://unipin.com/*', 'https://*.unipin.com/*'],
-    });
-    let targetTab = null;
-    const freshUrl = `${GARENA_SHOP_URL}&start=${task.startedAt}`;
-    if (tabs.length > 0) {
-      targetTab = await chrome.tabs.update(tabs[0].id, { url: freshUrl, active: true });
-    } else {
-      targetTab = await chrome.tabs.create({ url: freshUrl, active: true });
-    }
-
-    await chrome.storage.local.set({
       activeTabId: targetTab ? targetTab.id : null,
+      lastLog: `Picked Order ${shownOrder(task)} (${task.package_name})`,
     });
 
     return { ok: true, task };
   } catch (err) {
-    await chrome.storage.local.set({ lastLog: 'Network error: ' + err.message });
+    if (!picked) {
+      await chrome.storage.local.set({ lastLog: 'Network error: ' + err.message });
+      return { ok: false, error: err.message };
+    }
+    await chrome.storage.local.set({
+      activeTask: picked,
+      lastLog: 'Could not open Garena Shop. The order is cancelled.',
+    });
+    await submitOrderResult(
+      {
+        orderUtr: picked.order_utr,
+        status: 'CANCELLED',
+        errorMessage: 'Could not open Garena Shop. The order is cancelled.',
+        releaseVoucher: true,
+      },
+      null
+    );
     return { ok: false, error: err.message };
   }
 }
@@ -259,8 +281,14 @@ async function submitOrderResult({ orderUtr, status, receiptNote, errorMessage, 
   }
   const st = await getSettings();
   if (!st.extKey) return { ok: false, error: 'Missing Extension Key' };
+  const activeUtr = st.activeTask && String(st.activeTask.order_utr || '');
+  const pendingUtr = st.pendingResult && String(st.pendingResult.orderUtr || '');
+  if (orderUtr !== activeUtr && orderUtr !== pendingUtr) {
+    return { ok: false, error: 'This order is not active' };
+  }
 
   const tabToClose = senderTabId || st.activeTabId || null;
+  const clearTask = !st.activeTask || activeUtr === orderUtr;
 
   try {
     const res = await fetch(`${st.apiBase}/ext-api/order-result`, {
@@ -286,9 +314,9 @@ async function submitOrderResult({ orderUtr, status, receiptNote, errorMessage, 
       return { ok: false, error: data.error || 'Extension API failed' };
     }
     await chrome.storage.local.set({
-      pendingResult: null,
-      activeTask: null,
-      activeTabId: null,
+      pendingResult: pendingUtr === orderUtr ? null : st.pendingResult,
+      activeTask: clearTask ? null : st.activeTask,
+      activeTabId: clearTask ? null : st.activeTabId,
       lastLog: status === 'COMPLETED'
         ? `Completed ${orderUtr}`
         : status === 'LOGIN_FAILED'
@@ -319,6 +347,16 @@ async function submitOrderResult({ orderUtr, status, receiptNote, errorMessage, 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || typeof msg !== 'object') return;
   if (sender.id !== chrome.runtime.id) return;
+  if (msg.type === 'IS_ACTIVE_TAB') {
+    const tab = sender && sender.tab;
+    getSettings().then((st) => {
+      const same = Boolean(tab && tab.id === st.activeTabId);
+      const openedByActive = Boolean(tab && tab.openerTabId && tab.openerTabId === st.activeTabId);
+      if (openedByActive) chrome.storage.local.set({ activeTabId: tab.id });
+      sendResponse({ active: same || openedByActive });
+    });
+    return true;
+  }
   if (msg.type === 'POLL_NOW' || msg.type === 'CHECK_CONNECTION') {
     pollNextOrder(msg.type === 'POLL_NOW').then(sendResponse);
     return true;

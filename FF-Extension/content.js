@@ -85,22 +85,21 @@
     });
   }
 
-  function isUniPinSuccessPage(pageText, url) {
+  function isUniPinSuccessPage(url) {
     const u = (url || '').toLowerCase();
-    if (
-      /Transaction Successful|Payment Successful|Thank you for your purchase|Your payment is complete|Top[\s-]?up Successful|Redemption Successful|Transaction Complete|Order Complete|Purchase Successful|Payment Completed/i.test(
-        pageText
-      )
-    ) {
-      return true;
-    }
+    const pageText = document.body?.innerText || '';
+    const failed = /Failed|Unsuccessful|Rejected/i.test(pageText);
     if (
       (u.includes('/unibox/complete') || u.includes('/unibox/success') || u.includes('/payment/success')) &&
-      !/Failed|Error|Unsuccessful|Rejected/i.test(pageText)
+      !failed
     ) {
       return true;
     }
-    return false;
+    const phrase = /Transaction Successful|Payment Successful|Thank you for your purchase|Your payment is complete|Top[\s-]?up Successful|Redemption Successful|Transaction Complete|Order Complete|Purchase Successful|Payment Completed/i;
+    const el = findDeepestByText(phrase);
+    if (!el) return false;
+    const txt = (el.innerText || '').trim();
+    return txt.length >= 8 && txt.length <= 180;
   }
 
   function findVisiblePageError() {
@@ -179,6 +178,7 @@
       if (el.id === 'arora-ext-helper-bar' || el.closest('#arora-ext-helper-bar')) return false;
       if (!isVisible(el)) return false;
       const txt = (el.innerText || el.textContent || '').trim();
+      regex.lastIndex = 0;
       return regex.test(txt);
     });
     if (all.length === 0) return null;
@@ -312,11 +312,15 @@
     }
   }
 
-  async function runAutomationStep() {
+  function runAutomationStep() {
     if (stepBusy) return;
     stepBusy = true;
-
-    try {
+    chrome.runtime.sendMessage({ type: 'IS_ACTIVE_TAB' }, (gate) => {
+      if (chrome.runtime.lastError || !gate || !gate.active) {
+        stepBusy = false;
+        return;
+      }
+      try {
       chrome.storage.local.get(['activeTask'], (res) => {
         try {
         const task = res.activeTask;
@@ -358,7 +362,7 @@
         }
 
         // ==================== A. GARENA SHOP (shop.garena.my) ====================
-        if (host.includes('shop.garena.my')) {
+        if (host === 'shop.garena.my') {
           const playerUid = String(task.player_uid || '').trim();
           if (!/^\d{5,15}$/.test(playerUid)) {
             renderFloatingBar(task, 'Login Failed', true);
@@ -471,11 +475,11 @@
         }
 
         // ==================== B. UNIPIN (unipin.com) ====================
-        if (host.includes('unipin.com')) {
+        if (host === 'unipin.com' || host.endsWith('.unipin.com')) {
           const pageText = document.body?.innerText || '';
 
           // 1. Transaction Completed Receipt -> Mark COMPLETED & Auto-close tab
-          if (isUniPinSuccessPage(pageText, url)) {
+          if (isUniPinSuccessPage(url)) {
             renderFloatingBar(task, 'Payment Successful! Marking Completed & closing tab...', false);
             reportOnce(task, {
               orderUtr: task.order_utr,
@@ -494,9 +498,11 @@
           const allowErrorCheck = confirmClickedAt === 0 || Date.now() - confirmClickedAt >= 2500;
           if (allowErrorCheck) {
             const domErrText = findVisiblePageError();
-            const textErrMatch = pageText.match(
-              /Voucher already used|Voucher has been used|Invalid voucher|Invalid serial|Invalid PIN|Incorrect PIN|Wrong PIN|Insufficient balance|Not enough balance|Transaction Failed|Payment Failed|Unibox Error|Session expired|Unable to process|currently out of stock|Please enter no more than[^.\n]*|Please fill all Voucher field/i
-            );
+            const textErrMatch = confirmClickedAt > 0
+              ? pageText.match(
+                /Voucher already used|Voucher has been used|Invalid voucher|Invalid serial|Invalid PIN|Incorrect PIN|Wrong PIN|Insufficient balance|Not enough balance|Transaction Failed|Payment Failed|Unibox Error|Session expired|Unable to process|currently out of stock|Please enter no more than[^.\n]*|Please fill all Voucher field/i
+              )
+              : null;
             if (domErrText || textErrMatch) {
               const errDetail = domErrText || textErrMatch[0];
               // Self-heal: if UniPin rejects dashed serial with "no more than 14 characters", retry once without hyphens!
@@ -838,9 +844,10 @@
           stepBusy = false;
         }
       });
-    } catch (_) {
-      stepBusy = false;
-    }
+      } catch (_) {
+        stepBusy = false;
+      }
+    });
   }
 
   setTimeout(runAutomationStep, 1800);

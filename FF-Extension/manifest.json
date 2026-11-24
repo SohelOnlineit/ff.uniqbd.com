@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "UniQbd",
-  "version": "1.4.10",
+  "version": "1.4.11",
   "description": "Connects ff.uniqbd.com with Garena Shop & UniPin for operator-assisted Free Fire fulfillment (patient page-load waits, slow-network safe, auto-closes tab & clears Garena and UniPin cookies).",
   "permissions": [
     "storage",
