@@ -376,12 +376,6 @@
       letter-spacing: 0.04em;
     }
     tbody tr:last-child td { border-bottom: none; }
-    .note-cell {
-      max-width: 210px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      color: var(--muted);
-    }
     .row-actions { display: inline-flex; align-items: center; gap: 6px; }
     code {
       background: rgba(0, 186, 199, 0.1);
@@ -733,11 +727,6 @@
       }
       .orders-table td.empty-row::before,
       .tokens-table td.empty-row::before { content: none; }
-      .orders-table .note-cell {
-        max-width: none;
-        overflow: visible;
-        text-overflow: unset;
-      }
       .orders-table td[data-label="Action"] > .row-actions {
         display: flex;
         flex-wrap: wrap;
@@ -932,7 +921,6 @@
                   <th>Method</th>
                   <th>Status</th>
                   <th>Time</th>
-                  <th>Note</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -1514,11 +1502,11 @@
       const query = (document.getElementById('orderSearch') || {}).value || '';
       const rows = deskOrders.filter((order) => orderMatches(order, query));
       if (!deskOrders.length) {
-        body.innerHTML = '<tr><td colspan="8" class="empty-row" style="color:var(--muted);">No orders yet.</td></tr>';
+        body.innerHTML = '<tr><td colspan="7" class="empty-row" style="color:var(--muted);">No orders yet.</td></tr>';
         return;
       }
       if (!rows.length) {
-        body.innerHTML = '<tr><td colspan="8" class="empty-row" style="color:var(--muted);">No order found for this number.</td></tr>';
+        body.innerHTML = '<tr><td colspan="7" class="empty-row" style="color:var(--muted);">No order found for this number.</td></tr>';
         return;
       }
       body.innerHTML = rows.map((o) => {
@@ -1556,7 +1544,6 @@
             <td data-label="Method">${mLabel}</td>
             <td data-label="Status">${stBadge}</td>
             <td data-label="Time" style="color:var(--muted);">${whenText(o.created_at)}</td>
-            <td class="note-cell" data-label="Note" title="${esc(noteText)}">${esc(noteText)}</td>
             <td data-label="Action">
               <div class="row-actions">
                 ${o.status === 'COMPLETED'
