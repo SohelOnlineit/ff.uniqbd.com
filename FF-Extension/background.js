@@ -23,7 +23,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 async function getSettings() {
   return new Promise((resolve) => {
     chrome.storage.local.get(
-      ['apiBase', 'extKey', 'autoListen', 'activeTask', 'activeTabId', 'lastLog'],
+      ['apiBase', 'extKey', 'autoListen', 'activeTask', 'activeTabId', 'lastLog', 'pendingResult'],
       (res) => {
         const savedBase = String(res.apiBase || '').trim().replace(/\/+$/, '');
         const apiBase = !savedBase || savedBase === OLD_API_BASE ? DEFAULT_API_BASE : savedBase;
@@ -35,6 +35,7 @@ async function getSettings() {
           activeTask: res.activeTask || null,
           activeTabId: res.activeTabId || null,
           lastLog: res.lastLog || 'Idle',
+          pendingResult: res.pendingResult || null,
         });
       }
     );
@@ -115,6 +116,13 @@ async function pollNextOrder(force = false) {
   const st = await getSettings();
   if (!st.extKey) return { ok: false, error: 'Extension Key not set.' };
   await pingDesk(st);
+  if (st.pendingResult && st.pendingResult.orderUtr) {
+    const sent = await submitOrderResult(st.pendingResult, null);
+    if (!sent || sent.ok === false) return { ok: false, error: 'Website did not save the order status' };
+    st.pendingResult = null;
+    st.activeTask = null;
+    st.activeTabId = null;
+  }
 
   // A task with no start time, or one that has already run too long, must not block the next order.
   if (st.activeTask && !st.activeTask.startedAt) {
@@ -230,13 +238,21 @@ async function submitOrderResult({ orderUtr, status, receiptNote, errorMessage, 
         release_voucher: Boolean(releaseVoucher),
       }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok === false) {
+      await chrome.storage.local.set({
+        pendingResult: { orderUtr, status, receiptNote, errorMessage, releaseVoucher },
+        lastLog: `Website did not update ${orderUtr}. Trying again.`,
+      });
+      return { ok: false, error: data.error || 'Extension API failed' };
+    }
     await chrome.storage.local.set({
+      pendingResult: null,
       activeTask: null,
       activeTabId: null,
       lastLog: status === 'COMPLETED'
-        ? `Completed ${orderUtr} — Tab closed`
-        : `Failed ${orderUtr} (Admin notified, no retry) — Tab closed`,
+        ? `Completed ${orderUtr}`
+        : `Cancelled ${orderUtr}`,
     });
 
     // Clear Garena Shop cookies immediately so next order always starts with a clean UID login
@@ -251,6 +267,10 @@ async function submitOrderResult({ orderUtr, status, receiptNote, errorMessage, 
 
     return data;
   } catch (err) {
+    await chrome.storage.local.set({
+      pendingResult: { orderUtr, status, receiptNote, errorMessage, releaseVoucher },
+      lastLog: `Website did not update ${orderUtr}. Trying again.`,
+    });
     return { ok: false, error: err.message };
   }
 }

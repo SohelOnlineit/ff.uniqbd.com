@@ -838,12 +838,24 @@ function orderActionResult(id, action, body) {
 function cancelUndeliveredOrder(order, reason, receipt) {
   const why = String(reason || 'The extension could not deliver the diamonds. This order is cancelled.').slice(0, 500);
   const note = String(receipt || '').slice(0, 500);
-  pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
-    WHERE used_order_utr = ${sqlString(order.arora_order_utr)}`);
-  pg(`UPDATE fulfillment_orders
-    SET voucher_ids = NULL, method_used = 'none', account_id = NULL, status = 'CANCELLED',
-        status_reason = ${sqlString(why)}, receipt_note = ${sqlString(note)}
-    WHERE arora_order_utr = ${sqlString(order.arora_order_utr)} AND status <> 'COMPLETED'`);
+  const utr = sqlString(order.arora_order_utr);
+  try {
+    pg(`UPDATE fulfillment_orders
+      SET status = 'CANCELLED', status_reason = ${sqlString(why)}, receipt_note = ${sqlString(note)},
+          voucher_ids = NULL, method_used = 'none', account_id = NULL
+      WHERE arora_order_utr = ${utr} AND status <> 'COMPLETED'`);
+  } catch (err) {
+    console.error('cancel order:', dbError(err));
+    pg(`UPDATE fulfillment_orders
+      SET status = 'CANCELLED', status_reason = ${sqlString(why)}
+      WHERE arora_order_utr = ${utr} AND status <> 'COMPLETED'`);
+  }
+  try {
+    pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
+      WHERE used_order_utr = ${utr}`);
+  } catch (err) {
+    console.error('return token:', dbError(err));
+  }
   if (order.status !== 'CANCELLED') notifyOrderStatus(order, 'CANCELLED', why);
 }
 
@@ -906,8 +918,15 @@ function finishExtensionOrder(body) {
   const reason = String(body.error_message || body.receipt_note || '').slice(0, 500);
   const receipt = String(body.receipt_note || '').slice(0, 500);
   if (!utr) return;
-  const order = pgOne(`SELECT status, arora_order_utr, shop_order_number, player_uid, package_code, package_name, quantity, reseller_order_id, account_id, order_price_bdt, delivery_attempts
-    FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(utr)} LIMIT 1`);
+  let order = null;
+  try {
+    order = pgOne(`SELECT status, arora_order_utr, shop_order_number, player_uid, package_code, package_name, quantity, reseller_order_id, account_id, order_price_bdt
+      FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(utr)} LIMIT 1`);
+  } catch (err) {
+    console.error('order result lookup:', dbError(err));
+    order = pgOne(`SELECT status, arora_order_utr, player_uid, package_code, package_name, quantity, reseller_order_id, account_id
+      FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(utr)} LIMIT 1`);
+  }
   if (!order || order.status === 'COMPLETED') return;
   if (status !== 'COMPLETED') {
     cancelUndeliveredOrder(order, reason, receipt);
