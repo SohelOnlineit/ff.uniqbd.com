@@ -1584,7 +1584,15 @@ function pgDumpBin() {
   return 'pg_dump';
 }
 
-function backupFileName() {
+const BACKUP_DIR = path.join(__dirname, 'data', 'backups');
+const BACKUP_KEEP = 30;
+const BACKUP_NAME = /^ff-uniqbd-\d{8}\.sql$/;
+
+function dhakaNow(date = new Date()) {
+  return new Date(date.getTime() + 6 * 60 * 60 * 1000);
+}
+
+function backupStamp(date = new Date()) {
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   return 'ff-uniqbd-'
@@ -1598,73 +1606,187 @@ function backupFileName() {
     + '.sql';
 }
 
+function dailyBackupName(date = new Date()) {
+  const wall = dhakaNow(date);
+  const pad = (n) => String(n).padStart(2, '0');
+  return 'ff-uniqbd-'
+    + wall.getUTCFullYear()
+    + pad(wall.getUTCMonth() + 1)
+    + pad(wall.getUTCDate())
+    + '.sql';
+}
+
+function msUntilNextFiveAm(date = new Date()) {
+  const wall = dhakaNow(date);
+  const next = new Date(Date.UTC(wall.getUTCFullYear(), wall.getUTCMonth(), wall.getUTCDate(), 5, 0, 0, 0));
+  if (wall.getTime() >= next.getTime()) next.setUTCDate(next.getUTCDate() + 1);
+  return next.getTime() - wall.getTime();
+}
+
 let backupBusy = false;
+
+function dumpDatabase(file) {
+  return new Promise((resolve) => {
+    const dump = spawn(pgDumpBin(), [
+      '-h', process.env.PGHOST || '127.0.0.1',
+      '-p', String(process.env.PGPORT || '5432'),
+      '-U', process.env.PGUSER || 'ffapp',
+      '-d', process.env.PGDATABASE || 'ff_uniqbd',
+      '--no-owner',
+      '--no-acl',
+      '--format=p',
+      '-f', file,
+    ], {
+      env: { ...process.env, PGPASSWORD: process.env.PGPASSWORD || '' },
+      windowsHide: true,
+    });
+    dump.stderr.resume();
+    let settled = false;
+    const timer = setTimeout(() => dump.kill(), 120000);
+    const done = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+    dump.once('error', () => done({ ok: false, error: 'tool' }));
+    dump.once('close', (code) => {
+      if (code !== 0) return done({ ok: false, error: 'dump' });
+      try {
+        const size = fs.statSync(file).size;
+        if (!size) return done({ ok: false, error: 'dump' });
+        done({ ok: true, size });
+      } catch {
+        done({ ok: false, error: 'dump' });
+      }
+    });
+  });
+}
+
+function sendBackupFile(res, file, downloadName, onDone) {
+  const size = fs.statSync(file).size;
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    if (onDone) onDone();
+  };
+  res.writeHead(200, {
+    'Content-Type': 'application/sql; charset=utf-8',
+    'Content-Length': size,
+    'Content-Disposition': 'attachment; filename="' + downloadName + '"',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+    'Cache-Control': 'no-store',
+  });
+  const stream = fs.createReadStream(file);
+  stream.on('error', () => {
+    finish();
+    if (!res.writableEnded) res.destroy();
+  });
+  stream.on('close', finish);
+  res.on('close', finish);
+  stream.pipe(res);
+}
 
 function sendBackup(res) {
   if (backupBusy) return sendJson(res, 429, { ok: false, error: 'A backup is already running.' });
   backupBusy = true;
   const file = path.join(os.tmpdir(), 'ff-uniqbd-' + crypto.randomBytes(16).toString('hex') + '.sql');
-  let settled = false;
-  const finish = () => {
-    if (settled) return;
-    settled = true;
+  const release = () => {
     backupBusy = false;
     fs.unlink(file, () => {});
   };
-  const dump = spawn(pgDumpBin(), [
-    '-h', process.env.PGHOST || '127.0.0.1',
-    '-p', String(process.env.PGPORT || '5432'),
-    '-U', process.env.PGUSER || 'ffapp',
-    '-d', process.env.PGDATABASE || 'ff_uniqbd',
-    '--no-owner',
-    '--no-acl',
-    '--format=p',
-    '-f', file,
-  ], {
-    env: { ...process.env, PGPASSWORD: process.env.PGPASSWORD || '' },
-    windowsHide: true,
-  });
-  dump.stderr.resume();
-  const timer = setTimeout(() => dump.kill(), 120000);
-  dump.once('error', () => {
-    clearTimeout(timer);
-    finish();
-    if (!res.headersSent) sendJson(res, 500, { ok: false, error: 'Backup tool is not available.' });
-  });
-  dump.once('close', (code) => {
-    clearTimeout(timer);
-    if (settled) return;
-    if (code !== 0) {
-      finish();
-      if (!res.headersSent) sendJson(res, 500, { ok: false, error: 'Could not create the backup.' });
+  dumpDatabase(file).then((result) => {
+    if (!result.ok || res.destroyed) {
+      release();
+      if (!result.ok && !res.headersSent) {
+        const error = result.error === 'tool' ? 'Backup tool is not available.' : 'Could not create the backup.';
+        sendJson(res, 500, { ok: false, error });
+      }
       return;
     }
-    let size = 0;
     try {
-      size = fs.statSync(file).size;
+      sendBackupFile(res, file, backupStamp(), release);
     } catch {
-      finish();
+      release();
       if (!res.headersSent) sendJson(res, 500, { ok: false, error: 'Could not create the backup.' });
+    }
+  });
+}
+
+function savedBackupPath(name) {
+  if (!BACKUP_NAME.test(name)) return '';
+  const root = path.resolve(BACKUP_DIR);
+  const full = path.resolve(root, name);
+  if (!full.startsWith(root + path.sep)) return '';
+  return full;
+}
+
+function listBackups() {
+  if (!fs.existsSync(BACKUP_DIR)) return [];
+  return fs.readdirSync(BACKUP_DIR)
+    .filter((name) => BACKUP_NAME.test(name))
+    .map((name) => {
+      const stat = fs.statSync(path.join(BACKUP_DIR, name));
+      return { name, size: stat.size, created: stat.mtime.toISOString() };
+    })
+    .sort((a, b) => b.name.localeCompare(a.name));
+}
+
+function pruneBackups() {
+  const names = listBackups().map((row) => row.name).sort();
+  while (names.length > BACKUP_KEEP) {
+    const old = names.shift();
+    fs.unlink(path.join(BACKUP_DIR, old), () => {});
+  }
+}
+
+async function saveDailyBackup(attempt = 0) {
+  const name = dailyBackupName();
+  const dest = path.join(BACKUP_DIR, name);
+  if (fs.existsSync(dest)) return;
+  if (backupBusy) {
+    if (attempt < 5) {
+      await new Promise((resolve) => setTimeout(resolve, 30000));
+      return saveDailyBackup(attempt + 1);
+    }
+    console.error('daily backup skipped');
+    return;
+  }
+  backupBusy = true;
+  const tmp = dest + '.tmp';
+  try {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    const result = await dumpDatabase(tmp);
+    if (!result.ok) {
+      fs.unlink(tmp, () => {});
+      console.error('daily backup failed');
       return;
     }
-    res.writeHead(200, {
-      'Content-Type': 'application/sql; charset=utf-8',
-      'Content-Length': size,
-      'Content-Disposition': 'attachment; filename="' + backupFileName() + '"',
-      'X-Content-Type-Options': 'nosniff',
-      'X-Frame-Options': 'DENY',
-      'Referrer-Policy': 'no-referrer',
-      'Cache-Control': 'no-store',
-    });
-    const stream = fs.createReadStream(file);
-    stream.on('error', () => {
-      if (!res.writableEnded) res.destroy();
-      finish();
-    });
-    res.on('close', finish);
-    stream.on('close', finish);
-    stream.pipe(res);
-  });
+    fs.renameSync(tmp, dest);
+    pruneBackups();
+    console.log('daily backup saved');
+  } catch (err) {
+    fs.unlink(tmp, () => {});
+    console.error('daily backup failed');
+  } finally {
+    backupBusy = false;
+  }
+}
+
+function scheduleDailyBackup() {
+  const arm = () => {
+    setTimeout(() => {
+      saveDailyBackup().finally(arm);
+    }, msUntilNextFiveAm());
+  };
+  const wall = dhakaNow();
+  const pastFive = wall.getUTCHours() > 5 || (wall.getUTCHours() === 5 && wall.getUTCMinutes() >= 0);
+  const today = path.join(BACKUP_DIR, dailyBackupName());
+  if (pastFive && !fs.existsSync(today)) saveDailyBackup().finally(arm);
+  else arm();
 }
 
 function applyAdminReset() {
@@ -1800,6 +1922,27 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/admin-api/backup' && req.method === 'GET') {
     if (!readToken(req)) return sendJson(res, 401, { ok: false });
     return sendBackup(res);
+  }
+
+  if (pathname === '/admin-api/backups' && req.method === 'GET') {
+    if (!readToken(req)) return sendJson(res, 401, { ok: false });
+    return sendJson(res, 200, {
+      ok: true,
+      schedule: 'Every day at 5:00 AM, Bangladesh time',
+      backups: listBackups(),
+    });
+  }
+
+  const savedBackup = pathname.match(/^\/admin-api\/backups\/(ff-uniqbd-\d{8}\.sql)$/);
+  if (savedBackup && req.method === 'GET') {
+    if (!readToken(req)) return sendJson(res, 401, { ok: false });
+    const full = savedBackupPath(savedBackup[1]);
+    if (!full || !fs.existsSync(full)) return sendJson(res, 404, { ok: false, error: 'Backup not found.' });
+    try {
+      return sendBackupFile(res, full, savedBackup[1]);
+    } catch {
+      return sendJson(res, 500, { ok: false, error: 'Could not open the backup.' });
+    }
   }
 
   if (pathname === '/admin-api/logout' && req.method === 'POST') {
@@ -2099,4 +2242,5 @@ server.listen(port, host, () => {
     console.error('cancel stuck orders:', dbError(err));
   }
   console.log('ff.uniqbd.com listening on http://' + host + ':' + port);
+  scheduleDailyBackup();
 });

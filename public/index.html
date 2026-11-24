@@ -1416,7 +1416,7 @@
             </button>
             <button type="button" class="set-card" onclick="openSetting('backup')">
               <span class="set-ico" aria-hidden="true"><svg class="ico ico-lg" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></span>
-              <span><strong>Backup</strong><em>Download a SQL copy of this desk.</em></span>
+              <span><strong>Backup</strong><em>Saved every day at 5:00 AM.</em></span>
             </button>
           </div>
         </div>
@@ -1482,9 +1482,10 @@
                 Backup
               </div>
             </div>
-            <p style="color:var(--muted);font-size:13px;margin-bottom:12px;">Downloads a SQL copy of this desk. The file includes orders, tokens, and logins, so keep it private.</p>
+            <p style="color:var(--muted);font-size:13px;margin-bottom:12px;">A copy is saved on the server every day at 5:00 AM, Bangladesh time. The last 30 days are kept. The file includes orders, tokens, and logins, so keep it private.</p>
             <p id="backupErr" style="color:#fb7185;font-size:12px;margin:0 0 10px;"></p>
-            <button type="button" class="btn btn-primary" id="backupBtn" onclick="downloadBackup()">Download backup</button>
+            <button type="button" class="btn btn-primary" id="backupBtn" onclick="downloadBackup()">Download now</button>
+            <div id="backupList" style="margin-top:16px;"></div>
           </div>
         </div>
         <div id="setAdmins" class="set-panel hidden">
@@ -1647,6 +1648,7 @@
       backup.classList.toggle('hidden', name !== 'backup');
       if (name === 'ips') loadIpWhitelist();
       if (name === 'admins') loadAdmins();
+      if (name === 'backup') loadBackups();
     }
 
     function renderIpWhitelist(data) {
@@ -1967,6 +1969,66 @@
       }
     });
 
+    function backupLabel(name) {
+      const match = /^ff-uniqbd-(\d{4})(\d{2})(\d{2})\.sql$/.exec(name);
+      return match ? match[1] + '-' + match[2] + '-' + match[3] : name;
+    }
+
+    function renderBackups(rows) {
+      const list = document.getElementById('backupList');
+      if (!list) return;
+      if (!rows.length) {
+        list.innerHTML = '<p style="color:var(--muted);font-size:13px;margin:0;">No saved backup yet.</p>';
+        return;
+      }
+      list.innerHTML = rows.map((row) => `<div class="key-row" style="margin-bottom:8px;">
+        <input type="text" readonly value="${esc(backupLabel(row.name))} · ${Math.max(1, Math.round(row.size / 1024))} KB" />
+        <button type="button" class="btn btn-secondary btn-sm" data-backup="${esc(row.name)}">Download</button>
+      </div>`).join('');
+      list.querySelectorAll('[data-backup]').forEach((btn) => {
+        btn.addEventListener('click', () => downloadSavedBackup(btn.getAttribute('data-backup')));
+      });
+    }
+
+    async function loadBackups() {
+      const data = await api('/admin-api/backups');
+      if (!data.ok) return;
+      renderBackups(Array.isArray(data.backups) ? data.backups : []);
+    }
+
+    async function saveBackupFile(res, fallback) {
+      const blob = await res.blob();
+      const match = /filename="(ff-uniqbd-\d{8}(?:-\d{6})?\.sql)"/.exec(res.headers.get('Content-Disposition') || '');
+      const name = match ? match[1] : fallback;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = name;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function downloadSavedBackup(name) {
+      if (!/^ff-uniqbd-\d{8}\.sql$/.test(name)) return;
+      const err = document.getElementById('backupErr');
+      if (err) err.textContent = '';
+      try {
+        const savedToken = localStorage.getItem('arora_admin_token') || '';
+        const res = await fetch('/admin-api/backups/' + name, {
+          headers: savedToken ? { Authorization: 'Bearer ' + savedToken } : {},
+          cache: 'no-store',
+        });
+        if (!res.ok) {
+          if (err) err.textContent = res.status === 401 ? 'Sign in again.' : 'Could not open the backup.';
+          return;
+        }
+        await saveBackupFile(res, name);
+        showToast('Backup downloaded.');
+      } catch {
+        if (err) err.textContent = 'Could not open the backup.';
+      }
+    }
+
     async function downloadBackup() {
       const ok = await askConfirm('Download backup', 'This file contains the whole desk, including orders, tokens, and logins. Keep it private.', 'Download');
       if (!ok) return;
@@ -1989,15 +2051,7 @@
           if (err) err.textContent = message;
           return;
         }
-        const blob = await res.blob();
-        const match = /filename="(ff-uniqbd-\d{8}-\d{6}\.sql)"/.exec(res.headers.get('Content-Disposition') || '');
-        const name = match ? match[1] : 'ff-uniqbd-backup.sql';
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = name;
-        link.click();
-        URL.revokeObjectURL(url);
+        await saveBackupFile(res, 'ff-uniqbd-backup.sql');
         showToast('Backup downloaded.');
       } catch {
         if (err) err.textContent = 'Could not create the backup.';
