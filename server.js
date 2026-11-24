@@ -1,8 +1,9 @@
 const http = require('http');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
-const { execFileSync } = require('child_process');
+const { execFileSync, spawn } = require('child_process');
 
 const envFile = path.join(__dirname, '.env');
 if (fs.existsSync(envFile)) {
@@ -1575,6 +1576,97 @@ function dashboard() {
   };
 }
 
+function pgDumpBin() {
+  if (process.env.PG_DUMP_BIN) return process.env.PG_DUMP_BIN;
+  if (psqlBin && psqlBin !== 'psql') {
+    return path.join(path.dirname(psqlBin), process.platform === 'win32' ? 'pg_dump.exe' : 'pg_dump');
+  }
+  return 'pg_dump';
+}
+
+function backupFileName() {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return 'ff-uniqbd-'
+    + now.getUTCFullYear()
+    + pad(now.getUTCMonth() + 1)
+    + pad(now.getUTCDate())
+    + '-'
+    + pad(now.getUTCHours())
+    + pad(now.getUTCMinutes())
+    + pad(now.getUTCSeconds())
+    + '.sql';
+}
+
+let backupBusy = false;
+
+function sendBackup(res) {
+  if (backupBusy) return sendJson(res, 429, { ok: false, error: 'A backup is already running.' });
+  backupBusy = true;
+  const file = path.join(os.tmpdir(), 'ff-uniqbd-' + crypto.randomBytes(16).toString('hex') + '.sql');
+  let settled = false;
+  const finish = () => {
+    if (settled) return;
+    settled = true;
+    backupBusy = false;
+    fs.unlink(file, () => {});
+  };
+  const dump = spawn(pgDumpBin(), [
+    '-h', process.env.PGHOST || '127.0.0.1',
+    '-p', String(process.env.PGPORT || '5432'),
+    '-U', process.env.PGUSER || 'ffapp',
+    '-d', process.env.PGDATABASE || 'ff_uniqbd',
+    '--no-owner',
+    '--no-acl',
+    '--format=p',
+    '-f', file,
+  ], {
+    env: { ...process.env, PGPASSWORD: process.env.PGPASSWORD || '' },
+    windowsHide: true,
+  });
+  dump.stderr.resume();
+  const timer = setTimeout(() => dump.kill(), 120000);
+  dump.once('error', () => {
+    clearTimeout(timer);
+    finish();
+    if (!res.headersSent) sendJson(res, 500, { ok: false, error: 'Backup tool is not available.' });
+  });
+  dump.once('close', (code) => {
+    clearTimeout(timer);
+    if (settled) return;
+    if (code !== 0) {
+      finish();
+      if (!res.headersSent) sendJson(res, 500, { ok: false, error: 'Could not create the backup.' });
+      return;
+    }
+    let size = 0;
+    try {
+      size = fs.statSync(file).size;
+    } catch {
+      finish();
+      if (!res.headersSent) sendJson(res, 500, { ok: false, error: 'Could not create the backup.' });
+      return;
+    }
+    res.writeHead(200, {
+      'Content-Type': 'application/sql; charset=utf-8',
+      'Content-Length': size,
+      'Content-Disposition': 'attachment; filename="' + backupFileName() + '"',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'Referrer-Policy': 'no-referrer',
+      'Cache-Control': 'no-store',
+    });
+    const stream = fs.createReadStream(file);
+    stream.on('error', () => {
+      if (!res.writableEnded) res.destroy();
+      finish();
+    });
+    res.on('close', finish);
+    stream.on('close', finish);
+    stream.pipe(res);
+  });
+}
+
 function applyAdminReset() {
   const password = String(process.env.RESET_ADMIN_PASSWORD || '').trim();
   if (!password) return;
@@ -1703,6 +1795,11 @@ const server = http.createServer(async (req, res) => {
       console.error('password change failed:', dbError(err));
       return sendJson(res, 500, { ok: false, error: 'Could not update the password.' });
     }
+  }
+
+  if (pathname === '/admin-api/backup' && req.method === 'GET') {
+    if (!readToken(req)) return sendJson(res, 401, { ok: false });
+    return sendBackup(res);
   }
 
   if (pathname === '/admin-api/logout' && req.method === 'POST') {
