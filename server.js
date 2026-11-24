@@ -540,6 +540,13 @@ function ensureDeskColumns() {
       updated_at TIMESTAMP,
       is_active INTEGER
     )`,
+    `CREATE TABLE IF NOT EXISTS dismissed_orders (
+      reseller_id INTEGER NOT NULL,
+      reseller_order_id TEXT NOT NULL,
+      shop_order_number TEXT,
+      dismissed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (reseller_id, reseller_order_id)
+    )`,
   ];
   try {
     ensureIpWhitelist();
@@ -754,6 +761,31 @@ function shortenStoredOrderIds() {
   }
 }
 
+function rememberDismissedOrders(whereSql) {
+  try {
+    pg(`INSERT INTO dismissed_orders (reseller_id, reseller_order_id, shop_order_number)
+      SELECT reseller_id, reseller_order_id, COALESCE(shop_order_number, '')
+      FROM fulfillment_orders
+      WHERE ${whereSql}
+        AND reseller_id IS NOT NULL
+        AND COALESCE(reseller_order_id, '') <> ''
+      ON CONFLICT (reseller_id, reseller_order_id) DO NOTHING`);
+  } catch (err) {
+    console.error('dismiss order:', dbError(err));
+  }
+}
+
+function orderWasDismissed(resellerId, resellerOrderId) {
+  try {
+    return Boolean(pgOne(`SELECT reseller_order_id FROM dismissed_orders
+      WHERE reseller_id = ${Number(resellerId)} AND reseller_order_id = ${sqlString(resellerOrderId)}
+      LIMIT 1`));
+  } catch (err) {
+    console.error('dismissed lookup:', dbError(err));
+    return false;
+  }
+}
+
 function readShopOrderNumber(body) {
   const raw = [body.order_number, body.orderNumber, body.shop_order_number, body.uniqbd_order_number]
     .map((value) => String(value || '').trim().replace(/^#/, ''))
@@ -810,6 +842,17 @@ function placeResellerOrder(reseller, body, ip) {
       created.push(existing);
       continue;
     }
+    if (orderWasDismissed(reseller.id, resellerOrderId)) {
+      created.push({
+        arora_order_utr: '',
+        shop_order_number: shopOrderNumber,
+        status: 'CANCELLED',
+        package_code: pack.package_code,
+        package_name: pack.name,
+        dismissed: true,
+      });
+      continue;
+    }
     const utr = assignVisibleCode(shopOrderNumber, resellerOrderId);
     const tail = `${sqlString(playerUid)}, ${sqlString(pack.package_code)}, ${sqlString(pack.name)},
         1, 'none', 'QUEUED_EXT', ${Number(reseller.id)}, ${sqlString(resellerOrderId)}, ${unitPrice}, ${sqlString(ip)}`;
@@ -840,7 +883,9 @@ function placeResellerOrder(reseller, body, ip) {
       quantity,
       order_price_bdt: Math.round(unitPrice * quantity * 100) / 100,
       status: first.status,
-      message: 'Order queued for the matching Free Fire package.',
+      message: created.every((row) => row.dismissed)
+        ? 'This order was cleared and will not be queued again.'
+        : 'Order queued for the matching Free Fire package.',
     },
   };
 }
@@ -1009,6 +1054,7 @@ function orderActionResult(id, action, body) {
     if (!row) return { status: 404, body: { ok: false, error: 'Order not found' } };
     pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
       WHERE used_order_utr = ${sqlString(row.arora_order_utr)}`);
+    rememberDismissedOrders(`id = ${id}`);
     pg(`DELETE FROM fulfillment_orders WHERE id = ${id}`);
     return { status: 200, body: { ok: true } };
   }
@@ -1702,6 +1748,7 @@ const server = http.createServer(async (req, res) => {
     try {
       pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
         WHERE used_order_utr IN (SELECT arora_order_utr FROM fulfillment_orders WHERE status <> 'COMPLETED')`);
+      rememberDismissedOrders(`status <> 'COMPLETED'`);
       pg(`DELETE FROM fulfillment_orders WHERE status <> 'COMPLETED'`);
       return sendJson(res, 200, { ok: true, message: 'Pending orders cleared.' });
     } catch {
