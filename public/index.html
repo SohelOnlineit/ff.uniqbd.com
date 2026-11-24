@@ -744,36 +744,6 @@
           <div class="pkg-pick-label">Select package</div>
           <div class="pkg-grid" id="dashPkgCards"></div>
         </div>
-        <div class="card" style="margin-bottom:14px;">
-          <div class="card-head">
-            <div class="card-title">
-              <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-              Dashboard
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <span class="card-sub" id="webUpdated">Last update —</span>
-              <button type="button" class="btn btn-secondary btn-sm" onclick="checkUniqbd()">Check UniQbd</button>
-            </div>
-          </div>
-          <div id="connectBanner" class="connect-banner wait">
-            <span class="connect-dot"></span>
-            <div>
-              <strong id="connectTitle">Checking</strong>
-              <p id="connectDetail">Checking if uniqbd.com is connected.</p>
-            </div>
-          </div>
-          <p id="webVerdict" class="hidden" style="margin:0 0 12px;color:var(--muted);">Loading dashboard…</p>
-          <div id="webInfo" class="info-grid"></div>
-          <div class="info-box info-wide">
-            <div class="info-label">Extension key</div>
-            <div class="key-row">
-              <input type="text" id="extKeyBox" readonly style="font-family:monospace;font-size:12px;" />
-              <button type="button" class="btn btn-secondary btn-sm" onclick="copyExtKey()">Copy Key</button>
-              <a href="/arorashop-ff-extension.zip" download class="btn btn-primary btn-sm" style="text-decoration:none;">Download</a>
-            </div>
-          </div>
-          <pre id="uniqbdProbe" class="hidden" style="margin-top:12px;background:#06090d;border:1px solid var(--border);padding:12px;border-radius:10px;font-size:12px;overflow:auto;"></pre>
-        </div>
       </section>
 
       <!-- TAB 1: ORDERS -->
@@ -1009,6 +979,25 @@
               <span class="set-ico" aria-hidden="true"><svg class="ico ico-lg" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></span>
               <span><strong>Telegram</strong><em>Order alerts for each status.</em></span>
             </button>
+          </div>
+          <div class="card" style="margin-bottom:14px;">
+            <div class="card-head">
+              <div class="card-title">
+                <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                Connection
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <span class="card-sub" id="webUpdated">Last update —</span>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="checkUniqbd()">Check UniQbd</button>
+              </div>
+            </div>
+            <div id="connectBanner" class="connect-banner wait">
+              <span class="connect-dot"></span>
+              <div>
+                <strong id="connectTitle">Checking</strong>
+                <p id="connectDetail">Checking if uniqbd.com is connected.</p>
+              </div>
+            </div>
           </div>
           <div id="setInfo" class="info-grid"></div>
           <div class="info-box info-wide">
@@ -1370,12 +1359,11 @@
         }).join('');
 
       const s = d.security_info || {};
-      ['extKeyBox', 'setExtKey'].forEach((id) => {
-        const keyBox = document.getElementById(id);
-        if (!keyBox) return;
+      const keyBox = document.getElementById('setExtKey');
+      if (keyBox) {
         keyBox.value = maskSecret(s.extension_key);
         keyBox.dataset.full = s.extension_key || '';
-      });
+      }
       renderWebsite(d);
       } finally {
         dashBusy = false;
@@ -1417,7 +1405,8 @@
           <div class="info-label">${icon} ${label}</div>
           <div class="info-value">${value}</div>
         </div>`;
-      document.getElementById('webInfo').innerHTML = [
+      const setInfo = document.getElementById('setInfo');
+      if (setInfo) setInfo.innerHTML = [
         infoBox(ICONS.globe, 'This website', '<code>https://ff.uniqbd.com</code>'),
         infoBox(ICONS.globe, 'Shop', '<code>https://uniqbd.com</code>'),
         infoBox(ICONS.send, 'Order API', `<code>${esc(link.api_url || '')}</code>`),
@@ -1432,8 +1421,6 @@
         infoBox(ICONS.check, 'Orders', `<b>${d.stats.completed_orders} completed / ${d.stats.total_orders} total</b>`),
         infoBox(ICONS.shield, 'Packages ready', `<b>${readyCount} / ${activeCount}</b>`),
       ].join('');
-      const setInfo = document.getElementById('setInfo');
-      if (setInfo) setInfo.innerHTML = document.getElementById('webInfo').innerHTML;
     }
 
     function whenText(value) {
@@ -1670,7 +1657,7 @@
     }
 
     function copyExtKey(id) {
-      const box = document.getElementById(typeof id === 'string' ? id : 'extKeyBox') || document.getElementById('extKeyBox');
+      const box = document.getElementById(typeof id === 'string' ? id : 'setExtKey');
       const val = (box && box.dataset.full) || '';
       if (!val) return;
       navigator.clipboard.writeText(val);
