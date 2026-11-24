@@ -2,6 +2,14 @@ const DEFAULT_API_BASE = 'https://ff.uniqbd.com';
 const OLD_API_BASE = 'https://api.arorashop.com';
 const GARENA_SHOP_URL = 'https://shop.garena.my/?channel=202953';
 
+function shownOrder(task) {
+  const shop = String((task && task.shop_order_number) || '').trim();
+  const code = shop || String((task && task.order_utr) || '').trim();
+  if (/^\d+$/.test(code)) return '#' + code;
+  const pair = code.match(/^(\d+)-\d+$/);
+  return pair ? '#' + pair[1] : code;
+}
+
 function ensurePollAlarm() {
   chrome.alarms.create('aroraPollOrders', { periodInMinutes: 0.1 });
 }
@@ -206,7 +214,7 @@ async function pollNextOrder(force = false) {
 
     await chrome.storage.local.set({
       activeTask: task,
-      lastLog: `Picked Order ${task.order_utr} (${task.package_name})`,
+      lastLog: `Picked Order ${shownOrder(task)} (${task.package_name})`,
     });
 
     // Always clear previous Garena Shop session cookies before starting a fresh UID order

@@ -1,3 +1,11 @@
+function shownOrder(task) {
+  const shop = String((task && task.shop_order_number) || '').trim();
+  const code = shop || String((task && task.order_utr) || '').trim();
+  if (/^\d+$/.test(code)) return '#' + code;
+  const pair = code.match(/^(\d+)-\d+$/);
+  return pair ? '#' + pair[1] : code;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const apiBaseEl = document.getElementById('apiBase');
   const extKeyEl = document.getElementById('extKey');
@@ -11,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (res.extKey) extKeyEl.value = res.extKey;
       autoListenEl.checked = Boolean(res.autoListen);
       const text = res.activeTask
-        ? `Active: ${res.activeTask.order_utr} (UID: ${res.activeTask.player_uid})`
+        ? `Active: ${shownOrder(res.activeTask)} (UID: ${res.activeTask.player_uid})`
         : (res.lastLog || 'Not connected');
       statusBox.textContent = text;
       statusBox.style.color = /not saved|rejected|cannot reach|failed|error/i.test(text) ? '#fb7185' : '#34d399';

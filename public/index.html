@@ -1312,8 +1312,12 @@
 
     function orderIdText(order) {
       const shop = String(order.shop_order_number || '').trim();
-      if (shop) return /^\d+$/.test(shop) ? '#' + shop : shop;
-      return order.arora_order_utr || '';
+      const code = shop || String(order.arora_order_utr || order.used_order_utr || '').trim();
+      if (!code) return '';
+      if (/^\d+$/.test(code)) return '#' + code;
+      const pair = code.match(/^(\d+)-\d+$/);
+      if (pair) return '#' + pair[1];
+      return code;
     }
 
     function orderMatches(order, query) {
@@ -1576,7 +1580,7 @@
             <td><code>${esc(v.package_code)}</code></td>
             <td><code id="tok-${v.id}">${esc(v.masked_code)}</code><button type="button" class="tok-eye" onclick="toggleToken(${v.id}, this)" title="Show token">${ICONS.eye}</button></td>
             <td><span class="pill ${v.status === 'available' ? 'pill-green' : 'pill-blue'}">${v.status === 'available' ? 'Available' : 'Used'}</span></td>
-            <td>${v.used_order_utr ? `<code>${v.used_order_utr}</code>` : '-'}</td>
+            <td>${v.used_order_utr || v.shop_order_number ? `<code>${esc(orderIdText(v))}</code>` : '-'}</td>
             <td>${v.status === 'available' ? `<button class="btn btn-danger btn-sm" onclick="delVoucher(${v.id})">${ICONS.trash}</button>` : '-'}</td>
           </tr>
         `).join('');

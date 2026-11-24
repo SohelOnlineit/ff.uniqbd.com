@@ -221,6 +221,14 @@
     return false;
   }
 
+  function shownOrder(task) {
+    const shop = String((task && task.shop_order_number) || '').trim();
+    const code = shop || String((task && task.order_utr) || '').trim();
+    if (/^\d+$/.test(code)) return '#' + code;
+    const pair = code.match(/^(\d+)-\d+$/);
+    return pair ? '#' + pair[1] : code;
+  }
+
   function renderFloatingBar(task, statusText, isPaused) {
     let bar = document.getElementById('arora-ext-helper-bar');
     if (!bar) {
@@ -239,7 +247,7 @@
     bar.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
         <strong style="color:#15b48b;font-size:13px;">AroraShop Helper v1.4.7</strong>
-        <span style="background:rgba(21,180,139,0.16);color:#34d399;padding:2px 7px;border-radius:99px;font-size:11px;font-weight:600;">${task.order_utr}</span>
+        <span style="background:rgba(21,180,139,0.16);color:#34d399;padding:2px 7px;border-radius:99px;font-size:11px;font-weight:600;">${shownOrder(task)}</span>
       </div>
       <div style="color:#cbd5e1;margin-bottom:4px;">UID: <b>${task.player_uid}</b> &bull; <b>${task.denom_label}</b></div>
       <div style="color:#94a3b8;font-size:11px;margin-bottom:8px;">Mode: ${modeBadge}</div>

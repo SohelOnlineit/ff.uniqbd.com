@@ -573,6 +573,53 @@ function shortOrderUtr(resellerOrderId) {
   return code + alphabet[crypto.randomBytes(1)[0] % alphabet.length];
 }
 
+function assignVisibleCode(shopOrderNumber, resellerOrderId) {
+  const shop = String(shopOrderNumber || '').trim();
+  if (!shop) return shortOrderUtr(resellerOrderId);
+  const candidates = [shop];
+  for (let n = 2; n <= 20; n += 1) candidates.push(shop + '-' + n);
+  for (const code of candidates) {
+    const taken = pgOne(`SELECT reseller_order_id FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(code)} LIMIT 1`);
+    if (!taken || String(taken.reseller_order_id || '') === String(resellerOrderId || '')) return code;
+  }
+  return shortOrderUtr(resellerOrderId);
+}
+
+function applyShopOrderCode(row, shopOrderNumber, resellerOrderId) {
+  const shop = String(shopOrderNumber || (row && row.shop_order_number) || '').trim();
+  const current = String((row && row.arora_order_utr) || '');
+  const owner = String(resellerOrderId || (row && row.reseller_order_id) || '');
+  if (!row || !row.id || !shop || !current.startsWith('UQ-') || row.status === 'IN_PROGRESS_EXT') return current;
+  const next = assignVisibleCode(shop, owner);
+  if (!next || next === current) return current;
+  pg(`UPDATE unipin_vouchers SET used_order_utr = ${sqlString(next)} WHERE used_order_utr = ${sqlString(current)}`);
+  pg(`UPDATE fulfillment_orders SET arora_order_utr = ${sqlString(next)} WHERE id = ${Number(row.id)} AND arora_order_utr = ${sqlString(current)}`);
+  row.arora_order_utr = next;
+  return next;
+}
+
+function showShopOrderNumbers() {
+  let rows = [];
+  try {
+    rows = pgJson(`SELECT id, arora_order_utr, shop_order_number, reseller_order_id, status
+      FROM fulfillment_orders
+      WHERE COALESCE(shop_order_number, '') <> ''
+        AND arora_order_utr LIKE 'UQ-%'
+        AND status IS DISTINCT FROM 'IN_PROGRESS_EXT'
+      ORDER BY id`);
+  } catch (err) {
+    console.error('shop order code:', dbError(err));
+    return;
+  }
+  rows.forEach((row) => {
+    try {
+      applyShopOrderCode(row, row.shop_order_number, row.reseller_order_id);
+    } catch (err) {
+      console.error('shop order code:', dbError(err));
+    }
+  });
+}
+
 function shortenStoredOrderIds() {
   const rows = pgJson(`SELECT id, arora_order_utr, reseller_order_id FROM fulfillment_orders WHERE char_length(arora_order_utr) > 16`);
   for (const row of rows) {
@@ -611,13 +658,13 @@ function placeResellerOrder(reseller, body, ip) {
     const resellerOrderId = quantity === 1 ? orderId : orderId + '#' + index;
     let existing = null;
     try {
-      existing = pgOne(`SELECT id, arora_order_utr, shop_order_number, status, package_code, package_name
+      existing = pgOne(`SELECT id, arora_order_utr, shop_order_number, reseller_order_id, status, package_code, package_name
         FROM fulfillment_orders
         WHERE reseller_id = ${Number(reseller.id)} AND reseller_order_id = ${sqlString(resellerOrderId)}
         LIMIT 1`);
     } catch (err) {
       console.error('reseller order lookup:', dbError(err));
-      existing = pgOne(`SELECT id, arora_order_utr, status, package_code, package_name
+      existing = pgOne(`SELECT id, arora_order_utr, reseller_order_id, status, package_code, package_name
         FROM fulfillment_orders
         WHERE reseller_id = ${Number(reseller.id)} AND reseller_order_id = ${sqlString(resellerOrderId)}
         LIMIT 1`);
@@ -631,10 +678,15 @@ function placeResellerOrder(reseller, body, ip) {
           console.error('reseller order number:', dbError(err));
         }
       }
+      try {
+        applyShopOrderCode(existing, shopOrderNumber, resellerOrderId);
+      } catch (err) {
+        console.error('shop order code:', dbError(err));
+      }
       created.push(existing);
       continue;
     }
-    const utr = shortOrderUtr(resellerOrderId);
+    const utr = assignVisibleCode(shopOrderNumber, resellerOrderId);
     const tail = `${sqlString(playerUid)}, ${sqlString(pack.package_code)}, ${sqlString(pack.name)},
         1, 'none', 'QUEUED_EXT', ${Number(reseller.id)}, ${sqlString(resellerOrderId)}, ${unitPrice}, ${sqlString(ip)}`;
     try {
@@ -760,6 +812,7 @@ function claimNextTask() {
       const channel = voucherChannel(parts.serial);
       return {
         order_utr: order.arora_order_utr,
+        shop_order_number: order.shop_order_number || '',
         player_uid: order.player_uid,
         package_name: order.package_name,
         denom_label: order.package_name,
@@ -795,6 +848,7 @@ function claimNextTask() {
   notifyOrderStatus(order, 'IN_PROGRESS_EXT', '');
   return {
     order_utr: order.arora_order_utr,
+    shop_order_number: order.shop_order_number || '',
     player_uid: order.player_uid,
     package_name: order.package_name,
     denom_label: order.package_name,
@@ -1485,10 +1539,17 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/admin-api/vouchers') {
     if (!readToken(req)) return sendJson(res, 401, { ok: false });
     try {
-      return sendJson(res, 200, {
-        ok: true,
-        vouchers: pgJson('SELECT id, package_code, masked_code, status, used_order_utr FROM unipin_vouchers ORDER BY id DESC'),
-      });
+      let vouchers;
+      try {
+        vouchers = pgJson(`SELECT v.id, v.package_code, v.masked_code, v.status, v.used_order_utr, o.shop_order_number
+          FROM unipin_vouchers v
+          LEFT JOIN fulfillment_orders o ON o.arora_order_utr = v.used_order_utr
+          ORDER BY v.id DESC`);
+      } catch (err) {
+        console.error('voucher orders:', dbError(err));
+        vouchers = pgJson('SELECT id, package_code, masked_code, status, used_order_utr FROM unipin_vouchers ORDER BY id DESC');
+      }
+      return sendJson(res, 200, { ok: true, vouchers });
     } catch {
       return sendJson(res, 500, { ok: false });
     }
@@ -1551,6 +1612,11 @@ server.listen(port, host, () => {
     shortenStoredOrderIds();
   } catch (err) {
     console.error('Could not shorten old order ids');
+  }
+  try {
+    showShopOrderNumbers();
+  } catch (err) {
+    console.error('shop order code:', dbError(err));
   }
   try {
     cancelStuckProcessingOrders();
