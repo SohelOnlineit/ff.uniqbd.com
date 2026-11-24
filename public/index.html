@@ -191,7 +191,7 @@
     /* KPI Stats */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 12px;
       margin: 0 0 16px;
     }
@@ -588,44 +588,6 @@
     </header>
 
     <main class="container">
-      <section class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-top">
-            <span>Total Orders</span>
-            <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg>
-          </div>
-          <div class="stat-val" id="stTotal">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-top">
-            <span>Completed</span>
-            <svg class="ico ico-sm c-green" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-          </div>
-          <div class="stat-val c-green" id="stDone">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-top">
-            <span>Processing</span>
-            <svg class="ico ico-sm c-amber" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </div>
-          <div class="stat-val c-amber" id="stProc">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-top">
-            <span>Token Stock</span>
-            <svg class="ico ico-sm c-blue" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-          </div>
-          <div class="stat-val c-blue" id="stTokens">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-top">
-            <span>Account Balance (UP)</span>
-            <svg class="ico ico-sm c-green" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-          </div>
-          <div class="stat-val c-green" id="stBal">0</div>
-        </div>
-      </section>
-
       <section id="tab-website" class="tab-pane">
         <div class="card" style="margin-bottom:14px;">
           <div class="card-head">
@@ -679,44 +641,33 @@
             </table>
           </div>
         </div>
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-head">
-              <div class="card-title">Loaded accounts</div>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr><th>Account</th><th>Balance</th><th>Status</th></tr>
-                </thead>
-                <tbody id="webAccounts"></tbody>
-              </table>
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-head">
-              <div class="card-title">Latest orders</div>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Player</th>
-                    <th>Package</th>
-                    <th>Status</th>
-                    <th>Webhook</th>
-                    <th>Updated</th>
-                  </tr>
-                </thead>
-                <tbody id="webOrders"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
       </section>
 
       <!-- TAB 1: ORDERS -->
       <section id="tab-orders" class="tab-pane hidden">
+        <section class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-top">
+              <span>Total Orders</span>
+              <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg>
+            </div>
+            <div class="stat-val" id="stTotal">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-top">
+              <span>Completed</span>
+              <svg class="ico ico-sm c-green" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="stat-val c-green" id="stDone">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-top">
+              <span>Processing</span>
+              <svg class="ico ico-sm c-amber" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="stat-val c-amber" id="stProc">0</div>
+          </div>
+        </section>
         <div class="card">
           <div class="card-head">
             <div class="card-title">
@@ -753,6 +704,15 @@
 
       <!-- TAB 2: TOKENS -->
       <section id="tab-vouchers" class="tab-pane hidden">
+        <section class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-top">
+              <span>Token Stock</span>
+              <svg class="ico ico-sm c-blue" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            </div>
+            <div class="stat-val c-blue" id="stTokens">0</div>
+          </div>
+        </section>
         <div class="grid-2">
           <div class="card">
             <div class="card-head">
@@ -828,6 +788,15 @@
 
       <!-- TAB 3: ACCOUNTS -->
       <section id="tab-accounts" class="tab-pane hidden">
+        <section class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-top">
+              <span>Account Balance (UP)</span>
+              <svg class="ico ico-sm c-green" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            </div>
+            <div class="stat-val c-green" id="stBal">0</div>
+          </div>
+        </section>
         <div class="grid-2">
           <div class="card">
             <div class="card-head">
@@ -1263,26 +1232,6 @@
           </tr>
         `;
       }).join('');
-      document.getElementById('webAccounts').innerHTML = (d.accounts || []).length === 0
-        ? '<tr><td colspan="3" style="color:var(--muted);">No loaded account.</td></tr>'
-        : d.accounts.map((row) => `
-          <tr>
-            <td><b>${esc(row.label)}</b><br><span style="color:var(--muted);">${esc(row.masked_email)}</span></td>
-            <td>${esc(row.balance)} UP</td>
-            <td>${pill(String(row.status).toLowerCase() === 'active', 'Active', esc(row.status))}${row.has_security_pin ? '' : ' <span class="pill pill-amber">No PIN</span>'}</td>
-          </tr>
-        `).join('');
-      document.getElementById('webOrders').innerHTML = (d.orders || []).length === 0
-        ? '<tr><td colspan="5" style="color:var(--muted);">No orders yet.</td></tr>'
-        : d.orders.slice(0, 8).map((row) => `
-          <tr>
-            <td><code>${esc(row.player_uid)}</code></td>
-            <td>${esc(row.package_name)}</td>
-            <td><span class="pill ${row.status === 'COMPLETED' ? 'pill-green' : 'pill-amber'}">${esc(row.status)}</span></td>
-            <td>${esc(row.webhook_status || '—')}</td>
-            <td>${whenText(row.created_at)}</td>
-          </tr>
-        `).join('');
     }
 
     function whenText(value) {
