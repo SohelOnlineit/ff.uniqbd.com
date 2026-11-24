@@ -473,7 +473,7 @@
       box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
     }
     .ask-card strong { display: block; font-size: 18px; margin-bottom: 8px; }
-    .ask-card p { margin: 0 0 18px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .ask-card p { margin: 0 0 18px; color: var(--muted); font-size: 14px; line-height: 1.5; white-space: pre-line; }
     .ask-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
     /* Toast */
@@ -1603,11 +1603,25 @@
           tokens_text: document.getElementById('vTokensText').value,
         }),
       });
-      showToast(r.ok ? `Added ${r.added} token(s). Total stock: ${r.total_available}` : 'Failed to save tokens.');
-      if (r.ok) {
+      if (!r.ok) {
+        showToast('Failed to save tokens.');
+        return;
+      }
+      if (Number(r.added) > 0) {
         document.getElementById('vTokensText').value = '';
         loadDashboard();
         loadVouchers();
+        showToast(`Added ${r.added} token(s). Total stock: ${r.total_available}`);
+      }
+      if (Number(r.duplicates) > 0) {
+        const count = Number(r.duplicates);
+        const masks = Array.isArray(r.duplicate_masks) ? r.duplicate_masks.filter(Boolean) : [];
+        const lead = count === 1
+          ? 'This token is already added, so it was not saved again.'
+          : count + ' tokens are already added, so they were not saved again.';
+        const saved = Number(r.added) > 0 ? '\n' + r.added + ' new token(s) were saved.' : '';
+        const list = masks.length ? '\n' + masks.join('\n') : '';
+        await askNotice('Token already added', lead + saved + list);
       }
     });
 
@@ -1762,6 +1776,16 @@
       });
       showToast(r.ok ? 'Order marked completed.' : 'Action failed.');
       loadDashboard();
+    }
+
+    async function askNotice(title, text) {
+      const no = document.getElementById('askNo');
+      no.classList.add('hidden');
+      try {
+        await askConfirm(title, text, 'OK');
+      } finally {
+        no.classList.remove('hidden');
+      }
     }
 
     function askConfirm(title, text, yesLabel) {

@@ -403,6 +403,7 @@ function ensureDeskColumns() {
     'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS shop_order_number TEXT',
     'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS delivery_attempts INTEGER DEFAULT 0',
     'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMP',
+    'ALTER TABLE unipin_vouchers ADD COLUMN IF NOT EXISTS token_hash TEXT',
     'ALTER TABLE unipin_loaded_accounts ADD COLUMN IF NOT EXISTS security_pin_encrypted TEXT',
     'ALTER TABLE unipin_loaded_accounts ADD COLUMN IF NOT EXISTS masked_email TEXT',
     'ALTER TABLE unipin_loaded_accounts ADD COLUMN IF NOT EXISTS low_balance_threshold DOUBLE PRECISION DEFAULT 0',
@@ -986,16 +987,42 @@ function saveVoucherBatch(body) {
   if (!pack) return { ok: false, error: 'Unknown package' };
   const lines = String(body.tokens_text || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 200);
   let added = 0;
+  let duplicates = 0;
+  const duplicateMasks = [];
+  const seen = new Set();
   for (const line of lines) {
     const hash = crypto.createHash('sha256').update(pack.package_code + '\n' + line).digest('hex');
-    const exists = pgOne('SELECT id FROM unipin_vouchers WHERE code_hash = ' + sqlString(hash));
-    if (exists) continue;
-    pg(`INSERT INTO unipin_vouchers (package_code, code_hash, code_encrypted, masked_code, status)
-      VALUES (${sqlString(pack.package_code)}, ${sqlString(hash)}, ${sqlString(encryptSecret(line))}, ${sqlString(maskCode(line))}, 'available')`);
+    const tokenHash = crypto.createHash('sha256').update('ff-token\n' + line).digest('hex');
+    if (seen.has(tokenHash)) {
+      duplicates += 1;
+      if (duplicateMasks.length < 5) duplicateMasks.push(maskCode(line));
+      continue;
+    }
+    seen.add(tokenHash);
+    let exists = null;
+    try {
+      exists = pgOne(`SELECT id FROM unipin_vouchers WHERE code_hash = ${sqlString(hash)} OR token_hash = ${sqlString(tokenHash)} LIMIT 1`);
+    } catch (err) {
+      console.error('token duplicate check:', dbError(err));
+      exists = pgOne('SELECT id FROM unipin_vouchers WHERE code_hash = ' + sqlString(hash));
+    }
+    if (exists) {
+      duplicates += 1;
+      if (duplicateMasks.length < 5) duplicateMasks.push(maskCode(line));
+      continue;
+    }
+    try {
+      pg(`INSERT INTO unipin_vouchers (package_code, code_hash, token_hash, code_encrypted, masked_code, status)
+        VALUES (${sqlString(pack.package_code)}, ${sqlString(hash)}, ${sqlString(tokenHash)}, ${sqlString(encryptSecret(line))}, ${sqlString(maskCode(line))}, 'available')`);
+    } catch (err) {
+      console.error('token save:', dbError(err));
+      pg(`INSERT INTO unipin_vouchers (package_code, code_hash, code_encrypted, masked_code, status)
+        VALUES (${sqlString(pack.package_code)}, ${sqlString(hash)}, ${sqlString(encryptSecret(line))}, ${sqlString(maskCode(line))}, 'available')`);
+    }
     added += 1;
   }
   const total = pgOne(`SELECT COUNT(*) AS n FROM unipin_vouchers WHERE package_code = ${sqlString(pack.package_code)} AND lower(status) = 'available'`) || {};
-  return { ok: true, added, total_available: num(total.n) };
+  return { ok: true, added, duplicates, duplicate_masks: duplicateMasks, total_available: num(total.n) };
 }
 
 function touchExtension(ip) {
