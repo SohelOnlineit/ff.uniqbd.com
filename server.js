@@ -583,11 +583,19 @@ function shortenStoredOrderIds() {
   }
 }
 
+function readShopOrderNumber(body) {
+  const raw = [body.order_number, body.orderNumber, body.shop_order_number, body.uniqbd_order_number]
+    .map((value) => String(value || '').trim().replace(/^#/, ''))
+    .find((value) => value) || '';
+  if (/^\d{1,12}$/.test(raw)) return raw;
+  const digits = raw.match(/\b(\d{3,8})\b/);
+  if (digits) return digits[1];
+  return /^[A-Za-z0-9-]{1,32}$/.test(raw) ? raw : '';
+}
+
 function placeResellerOrder(reseller, body, ip) {
   const orderId = String(body.order_id || '').trim().slice(0, 80);
-  const shopOrderNumber = /^[A-Za-z0-9-]{1,32}$/.test(String(body.order_number || '').trim())
-    ? String(body.order_number).trim()
-    : '';
+  const shopOrderNumber = readShopOrderNumber(body);
   const playerUid = String(body.player_uid || '').trim();
   const quantity = Math.min(20, Math.max(1, Math.round(Number(body.quantity) || 1)));
   if (!orderId || !/^\d{5,20}$/.test(playerUid)) {
