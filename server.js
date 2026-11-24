@@ -130,15 +130,40 @@ function saveAccount(body) {
 }
 
 function editAccount(id, body) {
+  const existing = pgOne(`SELECT id FROM unipin_loaded_accounts WHERE id = ${id} LIMIT 1`);
+  if (!existing) return { ok: false, error: 'Account not found' };
+  const sets = [];
+  if (body.label !== undefined) {
+    const label = String(body.label || '').trim().slice(0, 80);
+    if (!label) return { ok: false, error: 'Account name is required.' };
+    sets.push(`label = ${sqlString(label)}`);
+  }
+  const email = String(body.email || '').trim().toLowerCase();
+  if (email) {
+    if (!email.includes('@') || email.length > 200) return { ok: false, error: 'Check the email.' };
+    sets.push(`email_encrypted = ${sqlString(encryptSecret(email))}`);
+    sets.push(`masked_email = ${sqlString(maskEmail(email))}`);
+  }
+  const password = String(body.password_or_pin || '');
+  if (password) {
+    if (password.length > 200) return { ok: false, error: 'Password is too long.' };
+    sets.push(`credentials_encrypted = ${sqlString(encryptSecret(password))}`);
+  }
+  const pin = String(body.security_pin || '').trim();
+  if (pin) {
+    if (!/^\d{6}$/.test(pin)) return { ok: false, error: 'PIN must be 6 digits.' };
+    sets.push(`security_pin_encrypted = ${sqlString(encryptSecret(pin))}`);
+  }
   const balance = money(body.balance, null);
   const low = money(body.low_balance_threshold, null);
+  if (balance === null || low === null) return { ok: false, error: 'Balance is required.' };
   const status = body.status === 'paused' ? 'paused' : 'active';
-  if (balance === null || low === null) return { ok: false };
+  sets.push(`balance = ${balance}`, `low_balance_threshold = ${low}`, `status = ${sqlString(status)}`);
   const saved = pg(`UPDATE unipin_loaded_accounts
-      SET balance = ${balance}, low_balance_threshold = ${low}, status = ${sqlString(status)}
+      SET ${sets.join(', ')}
       WHERE id = ${id}
       RETURNING id`);
-  return { ok: saved === String(id) };
+  return saved === String(id) ? { ok: true } : { ok: false, error: 'Account not found' };
 }
 
 function pg(sql) {
@@ -831,7 +856,8 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === 'PUT' && id) {
         const result = editAccount(id, JSON.parse(await readBody(req) || '{}'));
-        return sendJson(res, result.ok ? 200 : 404, result);
+        const code = result.ok ? 200 : result.error === 'Account not found' ? 404 : 400;
+        return sendJson(res, code, result);
       }
       if (req.method === 'DELETE' && id) {
         const removed = pg('DELETE FROM unipin_loaded_accounts WHERE id = ' + id + ' RETURNING id');

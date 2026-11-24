@@ -867,11 +867,11 @@
         <div class="grid-2">
           <div class="card">
             <div class="card-head">
-              <div class="card-title">
-                <svg class="ico" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
-                Add Loaded Account
+              <div class="card-title" id="accountFormTitle">
+                <svg class="ico" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/>                <line x1="23" y1="11" x2="17" y2="11"/></svg>
+                <span id="accountFormHeading">Add Loaded Account</span>
               </div>
-              <span class="card-sub">AES-256 Encrypted</span>
+              <span class="card-sub" id="accountFormSub">AES-256 Encrypted</span>
             </div>
             <form id="accountForm">
               <div class="field">
@@ -884,11 +884,11 @@
               </div>
               <div class="field">
                 <label for="accCred">Login Password</label>
-                <input type="password" id="accCred" required placeholder="Password" />
+                <input type="password" id="accCred" required placeholder="Password" autocomplete="new-password" />
               </div>
               <div class="field">
                 <label for="accPin">6-Digit Security PIN</label>
-                <input type="password" id="accPin" required maxlength="6" pattern="[0-9]{6}" inputmode="numeric" placeholder="6-digit PIN" />
+                <input type="password" id="accPin" required maxlength="6" pattern="[0-9]{6}" inputmode="numeric" placeholder="6-digit PIN" autocomplete="new-password" />
               </div>
               <div class="grid-2 pair" style="gap:10px;">
                 <div class="field">
@@ -900,10 +900,20 @@
                   <input type="number" step="1" id="accLow" required value="200" />
                 </div>
               </div>
-              <button type="submit" class="btn btn-primary w-full">
-                <svg class="ico ico-sm" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                Save Account
-              </button>
+              <div class="field hidden" id="accStatusWrap">
+                <label for="accStatus">Status</label>
+                <select id="accStatus">
+                  <option value="active">Active</option>
+                  <option value="paused">Paused</option>
+                </select>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button type="submit" class="btn btn-primary" style="flex:1;" id="accountSubmit">
+                  <svg class="ico ico-sm" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  <span id="accountSubmitLabel">Save Account</span>
+                </button>
+                <button type="button" class="btn btn-secondary hidden" id="accountCancel" onclick="setAccountFormMode(null)">Cancel</button>
+              </div>
             </form>
           </div>
 
@@ -1107,9 +1117,10 @@
         </tr>
       `).join('');
 
-      document.getElementById('accountsBody').innerHTML = d.accounts.length === 0
+      loadedAccounts = d.accounts || [];
+      document.getElementById('accountsBody').innerHTML = loadedAccounts.length === 0
         ? '<tr><td colspan="5" style="color:var(--muted);">No accounts added yet.</td></tr>'
-        : d.accounts.map((a) => `
+        : loadedAccounts.map((a) => `
           <tr>
             <td>
               <b>${esc(a.label)}</b><br/>
@@ -1126,6 +1137,7 @@
               </select>
             </td>
             <td style="display:flex;gap:6px;">
+              <button class="btn btn-secondary btn-sm" onclick="startEditAccount(${a.id})">Edit</button>
               <button class="btn btn-primary btn-sm" onclick="updateAccount(${a.id}, ${a.low_balance_threshold})">Save</button>
               <button class="btn btn-danger btn-sm" onclick="deleteAccount(${a.id})" title="Delete">${ICONS.trash}</button>
             </td>
@@ -1339,22 +1351,67 @@
       loadVouchers();
     }
 
+    let loadedAccounts = [];
+    let editingAccountId = 0;
+
+    function setAccountFormMode(account) {
+      const editing = Boolean(account);
+      editingAccountId = editing ? Number(account.id) : 0;
+      document.getElementById('accountFormHeading').textContent = editing ? 'Edit Loaded Account' : 'Add Loaded Account';
+      document.getElementById('accountFormSub').textContent = editing ? 'Blank email, password, and PIN stay unchanged' : 'AES-256 Encrypted';
+      document.getElementById('accEmail').required = !editing;
+      document.getElementById('accCred').required = !editing;
+      document.getElementById('accPin').required = !editing;
+      if (editing) document.getElementById('accPin').removeAttribute('pattern');
+      else document.getElementById('accPin').setAttribute('pattern', '[0-9]{6}');
+      document.getElementById('accStatusWrap').classList.toggle('hidden', !editing);
+      document.getElementById('accountCancel').classList.toggle('hidden', !editing);
+      document.getElementById('accountSubmitLabel').textContent = editing ? 'Save Changes' : 'Save Account';
+      if (!editing) {
+        document.getElementById('accountForm').reset();
+        document.getElementById('accEmail').placeholder = 'email@example.com';
+        document.getElementById('accCred').placeholder = 'Password';
+        document.getElementById('accPin').placeholder = '6-digit PIN';
+        return;
+      }
+      document.getElementById('accLabel').value = account.label || '';
+      document.getElementById('accEmail').value = '';
+      document.getElementById('accEmail').placeholder = (account.masked_email || 'current email') + ' — leave blank to keep';
+      document.getElementById('accCred').value = '';
+      document.getElementById('accCred').placeholder = 'Leave blank to keep';
+      document.getElementById('accPin').value = '';
+      document.getElementById('accPin').placeholder = 'Leave blank to keep';
+      document.getElementById('accBal').value = account.balance;
+      document.getElementById('accLow').value = account.low_balance_threshold;
+      document.getElementById('accStatus').value = account.status === 'paused' ? 'paused' : 'active';
+      document.getElementById('accLabel').focus();
+    }
+
+    function startEditAccount(id) {
+      const account = loadedAccounts.find((row) => Number(row.id) === Number(id));
+      if (!account) return;
+      setAccountFormMode(account);
+    }
+
     document.getElementById('accountForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const r = await api('/admin-api/accounts', {
-        method: 'POST',
-        body: JSON.stringify({
-          label: document.getElementById('accLabel').value,
-          email: document.getElementById('accEmail').value,
-          password_or_pin: document.getElementById('accCred').value,
-          security_pin: document.getElementById('accPin').value,
-          balance: document.getElementById('accBal').value,
-          low_balance_threshold: document.getElementById('accLow').value,
-        }),
+      const payload = {
+        label: document.getElementById('accLabel').value,
+        email: document.getElementById('accEmail').value,
+        password_or_pin: document.getElementById('accCred').value,
+        security_pin: document.getElementById('accPin').value,
+        balance: document.getElementById('accBal').value,
+        low_balance_threshold: document.getElementById('accLow').value,
+      };
+      const editing = editingAccountId;
+      if (editing) payload.status = document.getElementById('accStatus').value;
+      const r = await api(editing ? '/admin-api/accounts/' + editing : '/admin-api/accounts', {
+        method: editing ? 'PUT' : 'POST',
+        body: JSON.stringify(payload),
       });
-      showToast(r.ok ? 'Account saved securely.' : 'Check email, password, and 6-digit PIN.');
+      showToast(r.ok ? (editing ? 'Account updated.' : 'Account saved securely.') : (r.error || 'Check email, password, and 6-digit PIN.'));
       if (r.ok) {
-        document.getElementById('accountForm').reset();
+        setAccountFormMode(null);
         loadDashboard();
       }
     });
@@ -1368,7 +1425,7 @@
           low_balance_threshold: low,
         }),
       });
-      showToast(r.ok ? 'Account updated.' : 'Update failed.');
+      showToast(r.ok ? 'Account updated.' : (r.error || 'Update failed.'));
       loadDashboard();
     }
 
