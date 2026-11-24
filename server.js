@@ -255,6 +255,51 @@ function changeAdminPassword(username, body) {
   return { status: 200, body: { ok: true, username: nextName, token: signToken(saved.username, saved.password_hash), message } };
 }
 
+const ADMIN_NAME = /^[A-Za-z0-9._-]{3,32}$/;
+const ADMIN_LIMIT = 20;
+
+function listAdmins(currentUsername) {
+  const rows = pgJson('SELECT username, created_at FROM admins ORDER BY id');
+  return {
+    ok: true,
+    admins: rows.map((row) => ({
+      username: row.username,
+      created_at: row.created_at || '',
+      current: row.username === currentUsername,
+    })),
+  };
+}
+
+function addAdmin(actor, body) {
+  const username = String(body.username || '').trim();
+  const password = String(body.password || '');
+  const confirm = String(body.confirm_password || '');
+  if (!ADMIN_NAME.test(username)) {
+    return { status: 400, body: { ok: false, error: 'Admin ID must be 3 to 32 letters, numbers, dots, dashes, or underscores.' } };
+  }
+  if (password.length < 8 || password.length > 128) {
+    return { status: 400, body: { ok: false, error: 'Password must be 8 to 128 characters.' } };
+  }
+  if (password !== confirm) return { status: 400, body: { ok: false, error: 'Passwords do not match.' } };
+  const count = pgOne('SELECT COUNT(*)::int AS n FROM admins') || {};
+  if (num(count.n) >= ADMIN_LIMIT) return { status: 400, body: { ok: false, error: 'The admin list is full.' } };
+  const taken = pgOne(`SELECT username FROM admins WHERE username = ${sqlString(username)} LIMIT 1`);
+  if (taken) return { status: 400, body: { ok: false, error: 'That admin ID is already used.' } };
+  pg(`INSERT INTO admins (username, password_hash) VALUES (${sqlString(username)}, ${sqlString(hashPassword(password))})`);
+  return { status: 200, body: { ...listAdmins(actor), message: 'Admin added.' } };
+}
+
+function removeAdmin(actor, username) {
+  const name = String(username || '').trim();
+  if (!ADMIN_NAME.test(name)) return { status: 400, body: { ok: false, error: 'Admin not found.' } };
+  if (name === actor) return { status: 400, body: { ok: false, error: 'You cannot remove the login you are using.' } };
+  const count = pgOne('SELECT COUNT(*)::int AS n FROM admins') || {};
+  if (num(count.n) <= 1) return { status: 400, body: { ok: false, error: 'Keep at least one admin.' } };
+  const removed = pg(`DELETE FROM admins WHERE username = ${sqlString(name)} RETURNING username`);
+  if (removed !== name) return { status: 404, body: { ok: false, error: 'Admin not found.' } };
+  return { status: 200, body: { ...listAdmins(actor), message: 'Admin removed.' } };
+}
+
 function tokenStamp(passwordHash) {
   return crypto.createHash('sha256').update(String(passwordHash || '')).digest('base64url').slice(0, 16);
 }
@@ -551,6 +596,7 @@ function ensureDeskColumns() {
       dismissed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (reseller_id, reseller_order_id)
     )`,
+    'CREATE UNIQUE INDEX IF NOT EXISTS admins_username_key ON admins (username)',
   ];
   try {
     ensureIpWhitelist();
@@ -1609,6 +1655,42 @@ const server = http.createServer(async (req, res) => {
     const row = pgOne(`SELECT username, password_hash FROM admins WHERE username = ${sqlString(username)} LIMIT 1`);
     if (!row) return sendJson(res, 401, { ok: false });
     return sendJson(res, 200, { ok: true, username: row.username, token: signToken(row.username, row.password_hash) });
+  }
+
+  if (pathname === '/admin-api/admins' && req.method === 'GET') {
+    const username = readToken(req);
+    if (!username) return sendJson(res, 401, { ok: false });
+    try {
+      return sendJson(res, 200, listAdmins(username));
+    } catch (err) {
+      console.error('admin list failed:', dbError(err));
+      return sendJson(res, 500, { ok: false });
+    }
+  }
+
+  if (pathname === '/admin-api/admins' && req.method === 'POST') {
+    const username = readToken(req);
+    if (!username) return sendJson(res, 401, { ok: false });
+    try {
+      const result = addAdmin(username, JSON.parse(await readBody(req) || '{}'));
+      return sendJson(res, result.status, result.body);
+    } catch (err) {
+      console.error('admin add failed:', dbError(err));
+      return sendJson(res, 500, { ok: false, error: 'Could not add this admin.' });
+    }
+  }
+
+  const adminRemove = pathname.match(/^\/admin-api\/admins\/([A-Za-z0-9._-]{3,32})$/);
+  if (adminRemove && req.method === 'DELETE') {
+    const username = readToken(req);
+    if (!username) return sendJson(res, 401, { ok: false });
+    try {
+      const result = removeAdmin(username, decodeURIComponent(adminRemove[1]));
+      return sendJson(res, result.status, result.body);
+    } catch (err) {
+      console.error('admin remove failed:', dbError(err));
+      return sendJson(res, 500, { ok: false, error: 'Could not remove this admin.' });
+    }
   }
 
   if (pathname === '/admin-api/password' && req.method === 'POST') {

@@ -1098,6 +1098,10 @@
             </div>
           </div>
           <div class="set-grid">
+            <button type="button" class="set-card" onclick="openSetting('admins')">
+              <span class="set-ico" aria-hidden="true"><svg class="ico ico-lg" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg></span>
+              <span><strong>Admins</strong><em>Add another login for this desk.</em></span>
+            </button>
             <button type="button" class="set-card" onclick="openSetting('security')">
               <span class="set-ico" aria-hidden="true"><svg class="ico ico-lg" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
               <span><strong>Security</strong><em>Change the admin ID and login password.</em></span>
@@ -1167,6 +1171,35 @@
             </form>
             <p id="ipErr" style="color:#fb7185;font-size:12px;margin:0 0 10px;"></p>
             <div id="ipList"></div>
+          </div>
+        </div>
+        <div id="setAdmins" class="set-panel hidden">
+          <button type="button" class="btn btn-secondary btn-sm set-back" onclick="openSetting('')">← General</button>
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">
+                <svg class="ico" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                Admins
+              </div>
+            </div>
+            <p style="color:var(--muted);font-size:13px;margin-bottom:12px;">A new admin can sign in and use the whole desk. The login you are using now cannot be removed.</p>
+            <form id="adminForm">
+              <div class="field">
+                <label for="admUser">Admin ID</label>
+                <input type="text" id="admUser" required minlength="3" maxlength="32" autocomplete="off" placeholder="desk.admin" />
+              </div>
+              <div class="field">
+                <label for="admPass">Password</label>
+                <input type="password" id="admPass" required minlength="8" maxlength="128" autocomplete="new-password" />
+              </div>
+              <div class="field">
+                <label for="admConfirm">Confirm password</label>
+                <input type="password" id="admConfirm" required minlength="8" maxlength="128" autocomplete="new-password" />
+              </div>
+              <p id="admErr" style="color:#fb7185;font-size:12px;margin:0 0 10px;"></p>
+              <button type="submit" class="btn btn-primary">Add admin</button>
+            </form>
+            <div id="admList" style="margin-top:16px;"></div>
           </div>
         </div>
         <div id="setSecurity" class="set-panel hidden">
@@ -1288,13 +1321,16 @@
       const telegram = document.getElementById('setTelegram');
       const connection = document.getElementById('setConnection');
       const ips = document.getElementById('setIps');
-      if (!home || !security || !telegram || !connection || !ips) return;
+      const admins = document.getElementById('setAdmins');
+      if (!home || !security || !telegram || !connection || !ips || !admins) return;
       home.classList.toggle('hidden', Boolean(name));
       security.classList.toggle('hidden', name !== 'security');
       telegram.classList.toggle('hidden', name !== 'telegram');
       connection.classList.toggle('hidden', name !== 'connection');
       ips.classList.toggle('hidden', name !== 'ips');
+      admins.classList.toggle('hidden', name !== 'admins');
       if (name === 'ips') loadIpWhitelist();
+      if (name === 'admins') loadAdmins();
     }
 
     function renderIpWhitelist(data) {
@@ -1310,6 +1346,27 @@
           ${current ? '<span class="pill pill-green">This IP</span>' : `<button type="button" class="btn btn-danger btn-sm" data-ip-id="${Number(row.id)}">Remove</button>`}
         </div>`;
       }).join('');
+    }
+
+    function renderAdmins(data) {
+      const list = document.getElementById('admList');
+      if (!list) return;
+      const rows = Array.isArray(data.admins) ? data.admins : [];
+      list.innerHTML = rows.map((row) => `<div class="key-row" style="margin-bottom:8px;">
+          <input type="text" readonly value="${esc(row.username)}" style="font-family:monospace;font-size:12px;" />
+          ${row.current ? '<span class="pill pill-green">You</span>' : `<button type="button" class="btn btn-danger btn-sm" data-admin="${esc(row.username)}">Remove</button>`}
+        </div>`).join('');
+    }
+
+    async function loadAdmins() {
+      const err = document.getElementById('admErr');
+      const data = await api('/admin-api/admins');
+      if (!data.ok) {
+        if (err) err.textContent = data.error || 'Could not load admins.';
+        return;
+      }
+      if (err) err.textContent = '';
+      renderAdmins(data);
     }
 
     async function loadIpWhitelist() {
@@ -1449,6 +1506,44 @@
       if (err) err.textContent = '';
       renderIpWhitelist(data);
       showToast('IP removed.');
+    });
+
+    document.getElementById('adminForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('admErr');
+      if (err) err.textContent = '';
+      const data = await api('/admin-api/admins', {
+        method: 'POST',
+        body: JSON.stringify({
+          username: document.getElementById('admUser').value.trim(),
+          password: document.getElementById('admPass').value,
+          confirm_password: document.getElementById('admConfirm').value,
+        }),
+      });
+      if (!data.ok) {
+        if (err) err.textContent = data.error || 'Could not add this admin.';
+        return;
+      }
+      document.getElementById('adminForm').reset();
+      renderAdmins(data);
+      showToast('Admin added.');
+    });
+
+    document.getElementById('admList').addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-admin]');
+      if (!btn) return;
+      const name = btn.dataset.admin || '';
+      const yes = await askConfirm('Remove this admin?', name + ' will no longer be able to sign in.', 'Remove');
+      if (!yes) return;
+      const err = document.getElementById('admErr');
+      const data = await api('/admin-api/admins/' + encodeURIComponent(name), { method: 'DELETE' });
+      if (!data.ok) {
+        if (err) err.textContent = data.error || 'Could not remove this admin.';
+        return;
+      }
+      if (err) err.textContent = '';
+      renderAdmins(data);
+      showToast('Admin removed.');
     });
 
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
