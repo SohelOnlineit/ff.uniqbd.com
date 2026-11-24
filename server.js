@@ -676,10 +676,29 @@ function voucherChannel(serial) {
 const DELIVERY_TRY_LIMIT = 2;
 const DELIVERY_STOP_REASON = 'Delivery failed after 2 tries. The extension will not try this order again.';
 
+function cipherIsCurrent(column) {
+  return `substring(${column} from 1 for 10) = 'aes256gcm$'`;
+}
+
+function markOrderInProgress(orderId, sets) {
+  try {
+    pg(`UPDATE fulfillment_orders SET status = 'IN_PROGRESS_EXT', ${sets}, delivery_attempts = COALESCE(delivery_attempts, 0) + 1 WHERE id = ${Number(orderId)}`);
+  } catch (err) {
+    console.error('claim progress:', dbError(err));
+    pg(`UPDATE fulfillment_orders SET status = 'IN_PROGRESS_EXT', ${sets} WHERE id = ${Number(orderId)}`);
+  }
+}
+
 function stopOverTriedOrders() {
-  const rows = pgJson(`SELECT id, arora_order_utr, shop_order_number, player_uid, package_name, status
-    FROM fulfillment_orders
-    WHERE status = 'QUEUED_EXT' AND COALESCE(delivery_attempts, 0) >= ${DELIVERY_TRY_LIMIT}`);
+  let rows = [];
+  try {
+    rows = pgJson(`SELECT id, arora_order_utr, shop_order_number, player_uid, package_name, status
+      FROM fulfillment_orders
+      WHERE status = 'QUEUED_EXT' AND COALESCE(delivery_attempts, 0) >= ${DELIVERY_TRY_LIMIT}`);
+  } catch (err) {
+    console.error('stop over-tried:', dbError(err));
+    return;
+  }
   rows.forEach((row) => {
     pg(`UPDATE fulfillment_orders
       SET status = 'CANCELLED', status_reason = ${sqlString(DELIVERY_STOP_REASON)}, method_used = 'none', voucher_ids = NULL, account_id = NULL
@@ -690,21 +709,36 @@ function stopOverTriedOrders() {
 
 function claimNextTask() {
   stopOverTriedOrders();
-  const order = pgOne(`SELECT id, arora_order_utr, shop_order_number, player_uid, package_code, package_name, account_id
-    FROM fulfillment_orders
-    WHERE status = 'QUEUED_EXT' AND COALESCE(delivery_attempts, 0) < ${DELIVERY_TRY_LIMIT}
-    ORDER BY id
-    LIMIT 1`);
+  let order = null;
+  try {
+    order = pgOne(`SELECT id, arora_order_utr, shop_order_number, player_uid, package_code, package_name, account_id
+      FROM fulfillment_orders
+      WHERE status = 'QUEUED_EXT' AND COALESCE(delivery_attempts, 0) < ${DELIVERY_TRY_LIMIT}
+      ORDER BY id
+      LIMIT 1`);
+  } catch (err) {
+    console.error('claim order:', dbError(err));
+    order = pgOne(`SELECT id, arora_order_utr, player_uid, package_code, package_name, account_id
+      FROM fulfillment_orders
+      WHERE status = 'QUEUED_EXT'
+      ORDER BY id
+      LIMIT 1`);
+  }
   if (!order) return null;
-  const voucher = pgOne(`SELECT id, code_encrypted FROM unipin_vouchers
-    WHERE package_code = ${sqlString(order.package_code)} AND lower(status) = 'available' AND code_encrypted LIKE 'aes256gcm$%'
-    ORDER BY id LIMIT 1`);
+  let voucher = null;
+  try {
+    voucher = pgOne(`SELECT id, code_encrypted FROM unipin_vouchers
+      WHERE package_code = ${sqlString(order.package_code)} AND lower(status) = 'available' AND ${cipherIsCurrent('code_encrypted')}
+      ORDER BY id LIMIT 1`);
+  } catch (err) {
+    console.error('claim token:', dbError(err));
+  }
   if (voucher) {
     const plain = decryptSecret(voucher.code_encrypted);
     const parts = splitVoucher(plain);
     if (plain && parts.serial && parts.pin) {
       pg(`UPDATE unipin_vouchers SET status = 'used', used_order_utr = ${sqlString(order.arora_order_utr)}, used_at = CURRENT_TIMESTAMP WHERE id = ${Number(voucher.id)}`);
-      pg(`UPDATE fulfillment_orders SET status = 'IN_PROGRESS_EXT', method_used = 'unipin_voucher', voucher_ids = ${sqlString(String(voucher.id))}, delivery_attempts = COALESCE(delivery_attempts, 0) + 1 WHERE id = ${Number(order.id)}`);
+      markOrderInProgress(order.id, `method_used = 'unipin_voucher', voucher_ids = ${sqlString(String(voucher.id))}`);
       notifyOrderStatus(order, 'IN_PROGRESS_EXT', '');
       const channel = voucherChannel(parts.serial);
       return {
@@ -723,17 +757,24 @@ function claimNextTask() {
       };
     }
   }
-  const pack = pgOne(`SELECT unipin_uc_cost FROM ff_packages WHERE package_code = ${sqlString(order.package_code)} LIMIT 1`) || {};
-  const account = pgOne(`SELECT id, label, email_encrypted, credentials_encrypted, security_pin_encrypted, balance
-    FROM unipin_loaded_accounts
-    WHERE lower(status) = 'active' AND balance >= ${num(pack.unipin_uc_cost)} AND credentials_encrypted LIKE 'aes256gcm$%'
-    ORDER BY id LIMIT 1`);
+  let pack = {};
+  let account = null;
+  try {
+    pack = pgOne(`SELECT unipin_uc_cost FROM ff_packages WHERE package_code = ${sqlString(order.package_code)} LIMIT 1`) || {};
+    account = pgOne(`SELECT id, label, email_encrypted, credentials_encrypted, security_pin_encrypted, balance
+      FROM unipin_loaded_accounts
+      WHERE lower(status) = 'active' AND balance >= ${num(pack.unipin_uc_cost)} AND ${cipherIsCurrent('credentials_encrypted')}
+      ORDER BY id LIMIT 1`);
+  } catch (err) {
+    console.error('claim account:', dbError(err));
+    return null;
+  }
   if (!account) return null;
   const email = decryptSecret(account.email_encrypted);
   const password = decryptSecret(account.credentials_encrypted);
   const pin = decryptSecret(account.security_pin_encrypted);
   if (!email || !password || !pin) return null;
-  pg(`UPDATE fulfillment_orders SET status = 'IN_PROGRESS_EXT', method_used = 'loaded_account', account_id = ${Number(account.id)}, delivery_attempts = COALESCE(delivery_attempts, 0) + 1 WHERE id = ${Number(order.id)}`);
+  markOrderInProgress(order.id, `method_used = 'loaded_account', account_id = ${Number(account.id)}`);
   notifyOrderStatus(order, 'IN_PROGRESS_EXT', '');
   return {
     order_utr: order.arora_order_utr,
@@ -879,11 +920,19 @@ function saveVoucherBatch(body) {
 
 function touchExtension(ip) {
   const now = Date.now();
-  const saved = pg(`UPDATE extension_status SET last_seen_at = ${now}, last_ip = ${sqlString(ip)} RETURNING key_id`);
-  if (!saved) {
-    pg(`INSERT INTO extension_status (key_id, last_seen_at, last_ip) VALUES ('root', ${now}, ${sqlString(ip)})`);
+  try {
+    const saved = pg(`UPDATE extension_status SET last_seen_at = ${now}, last_ip = ${sqlString(ip)} RETURNING key_id`);
+    if (!saved) {
+      pg(`INSERT INTO extension_status (key_id, last_seen_at, last_ip) VALUES ('root', ${now}, ${sqlString(ip)})`);
+    }
+  } catch (err) {
+    console.error('extension seen:', dbError(err));
   }
-  pg(`UPDATE resellers SET ext_last_seen_at = ${now}, ext_last_ip = ${sqlString(ip)}`);
+  try {
+    pg(`UPDATE resellers SET ext_last_seen_at = ${now}, ext_last_ip = ${sqlString(ip)}`);
+  } catch (err) {
+    console.error('extension seen:', dbError(err));
+  }
 }
 
 function seenOnline(ts) {
