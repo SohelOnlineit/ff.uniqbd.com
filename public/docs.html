@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="icon" type="image/png" href="/logo.png" />
-  <title>AroraShop API — Public Integration &amp; Webhook Documentation</title>
+  <link rel="icon" type="image/webp" href="/logo.webp" />
+  <title>FF.UniQbd — API Documentation</title>
   <style>
     :root {
       color-scheme: dark;
@@ -43,6 +43,7 @@
       background: linear-gradient(135deg, #00e699, #0099ff);
       display: flex; align-items: center; justify-content: center; font-weight: 900; color: #051014;
     }
+    .brand img { height: 42px; width: auto; max-width: 168px; object-fit: contain; }
     .brand h1 { font-size: 16px; font-weight: 800; }
     .brand small { color: var(--muted); font-size: 12px; display: block; }
     .actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -149,9 +150,9 @@
   <header class="topbar">
     <div class="topbar-inner">
       <div class="brand">
-        <img src="/logo.png" alt="AroraShop" style="height:34px;width:auto;display:block;object-fit:contain;" />
+        <img src="/logo.webp" alt="FF.UniQbd" style="height:44px;width:auto;max-width:170px;display:block;object-fit:contain;" />
         <div>
-          <h1>AroraShop API Documentation</h1>
+          <h1>FF.UniQbd</h1>
           <small>Free Fire Auto-Delivery REST API v1 &amp; Auto-Complete Webhook Guide</small>
         </div>
       </div>
@@ -179,7 +180,7 @@
       <!-- 1. QUICK START -->
       <section class="card" id="quickstart">
         <h2>1. Quick Start Overview</h2>
-        <p>Connect your top-up website to <b>AroraShop Auto-Delivery API</b> in 3 simple steps:</p>
+        <p>Connect your top-up website to <b>FF.UniQbd Auto-Delivery API</b> in 3 simple steps:</p>
         <ol>
           <li><b>Get Credentials:</b> Log in to your Partner Dashboard at <a href="/user/login">https://ff.uniqbd.com/user/login</a> → open <b>API Keys, Webhook &amp; Telegram</b> to copy your <code>X-API-Key</code> and <code>X-API-Secret</code>.</li>
           <li><b>Top-Up Wallet (BDT):</b> Top up your BDT wallet instantly from your dashboard via <b>bKash / Nagad / Rocket / Upay</b> (<code>pay.arorashop.com</code>) and check your custom BDT diamond price list.</li>
@@ -391,7 +392,7 @@ print(res.status_code, res.json())</code></pre>
       <!-- 6. WEBHOOK SETUP GUIDE -->
       <section class="card" id="webhook-guide">
         <h2>6. How to Build &amp; Connect Your Webhook (Auto-Complete Orders)</h2>
-        <p>A <b>Webhook</b> is a public <code>POST</code> URL on your website (for example: <code>https://yourwebsite.com/api/arora-webhook</code>). As soon as AroraShop finishes delivering diamonds to the player's UID, our server sends an HTTP <code>POST</code> request to your Webhook URL so your website marks the order <b>COMPLETED</b> automatically — zero manual work!</p>
+        <p>A <b>Webhook</b> is a public <code>POST</code> URL on your website (for example: <code>https://yourwebsite.com/api/arora-webhook</code>). As soon as FF.UniQbd finishes delivering diamonds to the player's UID, our server sends an HTTP <code>POST</code> request to your Webhook URL so your website marks the order <b>COMPLETED</b> automatically — zero manual work!</p>
 
         <h3>Step-by-Step Setup:</h3>
         <ol>
@@ -402,7 +403,7 @@ print(res.status_code, res.json())</code></pre>
           <li>Go to <a href="/user/dashboard">Partner Dashboard</a> → <b>API Keys, Webhook &amp; Telegram</b> → paste your Webhook URL → click <b>Save Webhook URL</b> → click <b>Send Test Webhook</b> to confirm <code>HTTP 200 OK</code>!</li>
         </ol>
 
-        <h3>Webhook Headers Sent by AroraShop</h3>
+        <h3>Webhook Headers Sent by FF.UniQbd</h3>
         <div class="code-wrap">
           <button class="copy-btn" onclick="copyCode(this)">Copy</button>
           <pre><code>Content-Type: application/json

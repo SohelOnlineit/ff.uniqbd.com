@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="icon" type="image/png" href="/logo.png" />
+  <link rel="icon" type="image/webp" href="/logo.webp" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>AroraShop API</title>
+  <title>FF.UniQbd</title>
   <style>
     :root {
       color-scheme: dark;
@@ -77,10 +77,14 @@
     }
     .login-head {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       margin-bottom: 6px;
+      text-align: center;
     }
+    .login-head strong { font-size: 20px; letter-spacing: -0.03em; }
+    .site-logo { height: 52px; width: auto; max-width: 100%; object-fit: contain; display: block; }
     .brand-icon {
       width: 34px;
       height: 34px;
@@ -239,8 +243,9 @@
       padding: 16px 12px;
       box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.08), 0 16px 36px rgba(0, 20, 24, 0.18);
     }
-    .side-brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px 14px; }
-    .side-brand strong { display: block; font-size: 14px; }
+    .side-brand { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 4px 6px 14px; }
+    .side-brand img { height: 46px; width: auto; max-width: 100%; object-fit: contain; display: block; }
+    .side-brand strong { display: block; font-size: 16px; letter-spacing: -0.03em; }
     .side-brand span { display: block; color: rgba(232, 255, 251, 0.62); font-size: 11px; }
     .side-label {
       display: flex;
@@ -309,6 +314,7 @@
         var(--surface);
       box-shadow: 0 0 0 1px rgba(0, 186, 199, 0.06), 0 14px 32px rgba(0, 186, 199, 0.1);
     }
+    .hello-logo { height: 46px; width: auto; max-width: 190px; object-fit: contain; display: block; }
     .hello-mark {
       display: grid;
       place-items: center;
@@ -530,7 +536,8 @@
   <div id="loginView" class="login-wrap hidden">
     <div class="login-card">
       <div class="login-head" style="justify-content:center;">
-        <img src="/logo.png" alt="AroraShop" style="height:40px;width:auto;display:block;object-fit:contain;" />
+        <img class="site-logo" src="/logo.webp" alt="FF.UniQbd" />
+        <strong>FF.UniQbd</strong>
       </div>
       <p class="login-sub">Private Admin Sign In</p>
 
@@ -557,9 +564,9 @@
     <div class="app-shell">
     <aside class="side">
       <div class="side-brand">
-        <img src="/logo.png" alt="AroraShop" style="height:36px;width:auto;display:block;object-fit:contain;background:#fff;border-radius:10px;padding:4px;" />
+        <img src="/logo.webp" alt="FF.UniQbd" />
         <div>
-          <strong>AroraShop</strong>
+          <strong>FF.UniQbd</strong>
           <span>Free Fire Desk</span>
         </div>
       </div>
@@ -617,10 +624,10 @@
 
     <main class="container">
       <section class="hello">
-        <div class="hello-mark">A</div>
+        <img class="hello-logo" src="/logo.webp" alt="" />
         <div>
           <p>Hello, aroraadmin</p>
-          <h1>Free Fire Desk</h1>
+          <h1>FF.UniQbd</h1>
         </div>
         <div class="hello-date" id="helloDate"></div>
       </section>

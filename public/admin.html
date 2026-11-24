@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="icon" type="image/png" href="/logo.png" />
-  <title>AroraShop Super Admin — Reseller Prices, Wallets &amp; Orders</title>
+  <link rel="icon" type="image/webp" href="/logo.webp" />
+  <title>FF.UniQbd Admin</title>
   <style>
     :root {
       color-scheme: dark;
@@ -44,6 +44,7 @@
       background: linear-gradient(135deg, #00bac7, #08788c);
       display: flex; align-items: center; justify-content: center; font-weight: 900; color: #051014;
     }
+    .brand img { height: 42px; width: auto; max-width: 168px; object-fit: contain; }
     .brand h1 { font-size: 16px; font-weight: 800; }
     .brand small { color: var(--muted); font-size: 12px; display: block; }
     .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -149,9 +150,9 @@
   <div id="loginView" class="login-wrap">
     <div class="login-card">
       <div class="brand" style="margin-bottom:18px;">
-        <img src="/logo.png" alt="AroraShop" style="height:34px;width:auto;display:block;object-fit:contain;" />
+        <img src="/logo.webp" alt="FF.UniQbd" style="height:44px;width:auto;max-width:170px;display:block;object-fit:contain;" />
         <div>
-          <h1>AroraShop Super Admin</h1>
+          <h1>FF.UniQbd</h1>
           <small>Reseller Pricing, Wallets &amp; Fulfillment</small>
         </div>
       </div>
@@ -175,15 +176,15 @@
     <header class="topbar">
       <div class="topbar-inner">
         <div class="brand">
-          <img src="/logo.png" alt="AroraShop" style="height:34px;width:auto;display:block;object-fit:contain;" />
+          <img src="/logo.webp" alt="FF.UniQbd" style="height:44px;width:auto;max-width:170px;display:block;object-fit:contain;" />
           <div>
-            <h1>AroraShop Super Admin</h1>
+            <h1>FF.UniQbd</h1>
             <small>Manage Resellers, Custom BDT Price Lists, Wallets &amp; Manual Orders (Shared Chrome Extension)</small>
           </div>
         </div>
         <div class="actions">
           <a href="/docs" target="_blank" class="btn btn-sm" style="border-color:rgba(56,189,248,.45);color:#38bdf8;">📖 API &amp; Webhook Docs</a>
-          <a href="/" class="btn btn-sm">← Main AroraShop Stock</a>
+          <a href="/" class="btn btn-sm">← FF.UniQbd</a>
           <button class="btn btn-sm" onclick="loadOverview()">Refresh</button>
           <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
         </div>

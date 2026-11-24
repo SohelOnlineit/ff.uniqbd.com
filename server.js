@@ -33,6 +33,7 @@ const pages = {
 const types = {
   '.html': 'text/html; charset=utf-8',
   '.png': 'image/png',
+  '.webp': 'image/webp',
   '.css': 'text/css',
   '.js': 'text/javascript',
   '.zip': 'application/zip',
