@@ -548,6 +548,7 @@
     .set-card em { display: block; line-height: 1.4; }
     .set-card:hover { border-color: #1a6b62; }
     .set-panel { max-width: 640px; }
+    #setConnection.set-panel { max-width: none; }
     .set-back { margin-bottom: 12px; }
 
     @media (max-width: 1200px) {
@@ -988,7 +989,14 @@
               <span class="set-ico" aria-hidden="true"><svg class="ico ico-lg" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></span>
               <span><strong>Telegram</strong><em>Order alerts for each status.</em></span>
             </button>
+            <button type="button" class="set-card" onclick="openSetting('connection')">
+              <span class="set-ico" aria-hidden="true"><svg class="ico ico-lg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span>
+              <span><strong>Connection</strong><em>Website, shop, webhook, and extension.</em></span>
+            </button>
           </div>
+        </div>
+        <div id="setConnection" class="set-panel hidden">
+          <button type="button" class="btn btn-secondary btn-sm set-back" onclick="openSetting('')">← General</button>
           <div class="card" style="margin-bottom:14px;">
             <div class="card-head">
               <div class="card-title">
@@ -1122,10 +1130,12 @@
       const home = document.getElementById('setHome');
       const security = document.getElementById('setSecurity');
       const telegram = document.getElementById('setTelegram');
-      if (!home || !security || !telegram) return;
+      const connection = document.getElementById('setConnection');
+      if (!home || !security || !telegram || !connection) return;
       home.classList.toggle('hidden', Boolean(name));
       security.classList.toggle('hidden', name !== 'security');
       telegram.classList.toggle('hidden', name !== 'telegram');
+      connection.classList.toggle('hidden', name !== 'connection');
     }
 
     function switchTab(name, btn) {
