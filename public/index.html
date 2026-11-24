@@ -83,7 +83,8 @@
       margin-bottom: 6px;
       text-align: center;
     }
-    .login-head strong { font-size: 20px; letter-spacing: -0.03em; }
+    .login-head strong { display: block; font-size: 20px; letter-spacing: -0.03em; }
+    .login-head span { display: block; color: var(--muted); font-size: 12px; }
     .site-logo { height: 52px; width: auto; max-width: 100%; object-fit: contain; display: block; }
     .brand-icon {
       width: 34px;
@@ -243,8 +244,8 @@
       padding: 16px 12px;
       box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.08), 0 16px 36px rgba(0, 20, 24, 0.18);
     }
-    .side-brand { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 4px 6px 14px; }
-    .side-brand img { height: 46px; width: auto; max-width: 100%; object-fit: contain; display: block; }
+    .side-brand { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; padding: 4px 6px 14px; }
+    .side-brand img { height: 46px; width: auto; max-width: 100%; object-fit: contain; display: block; margin-bottom: 6px; }
     .side-brand strong { display: block; font-size: 16px; letter-spacing: -0.03em; }
     .side-brand span { display: block; color: rgba(232, 255, 251, 0.62); font-size: 11px; }
     .side-label {
@@ -315,6 +316,9 @@
       box-shadow: 0 0 0 1px rgba(0, 186, 199, 0.06), 0 14px 32px rgba(0, 186, 199, 0.1);
     }
     .hello-logo { height: 46px; width: auto; max-width: 190px; object-fit: contain; display: block; }
+    .hello-brand { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1px; }
+    .hello-brand strong { font-size: 18px; letter-spacing: -0.03em; }
+    .hello-brand span { color: var(--muted); font-size: 12px; }
     .hello-mark {
       display: grid;
       place-items: center;
@@ -538,6 +542,7 @@
       <div class="login-head" style="justify-content:center;">
         <img class="site-logo" src="/logo.webp" alt="FF.UniQbd" />
         <strong>FF.UniQbd</strong>
+        <span>Free Fire Desk</span>
       </div>
       <p class="login-sub">Private Admin Sign In</p>
 
@@ -624,10 +629,13 @@
 
     <main class="container">
       <section class="hello">
-        <img class="hello-logo" src="/logo.webp" alt="" />
+        <div class="hello-brand">
+          <img class="hello-logo" src="/logo.webp" alt="" />
+          <strong>FF.UniQbd</strong>
+          <span>Free Fire Desk</span>
+        </div>
         <div>
           <p>Hello, aroraadmin</p>
-          <h1>FF.UniQbd</h1>
         </div>
         <div class="hello-date" id="helloDate"></div>
       </section>
