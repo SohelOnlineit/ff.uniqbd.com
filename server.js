@@ -400,6 +400,7 @@ function ensureDeskColumns() {
     'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS webhook_status TEXT',
     'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS quantity INTEGER DEFAULT 1',
     'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS arora_order_utr TEXT',
+    'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS shop_order_number TEXT',
     'ALTER TABLE unipin_loaded_accounts ADD COLUMN IF NOT EXISTS security_pin_encrypted TEXT',
     'ALTER TABLE unipin_loaded_accounts ADD COLUMN IF NOT EXISTS masked_email TEXT',
     'ALTER TABLE unipin_loaded_accounts ADD COLUMN IF NOT EXISTS low_balance_threshold DOUBLE PRECISION DEFAULT 0',
@@ -471,7 +472,7 @@ function notifyOrderStatus(order, status, note) {
   if (!telegramAlertMap(raw)[status]) return;
   const lines = [
     'FF.UniQbd · ' + TELEGRAM_STATUS_LABEL[status],
-    order.arora_order_utr || '',
+    order.shop_order_number || order.arora_order_utr || '',
     order.package_name || '',
     order.player_uid ? 'UID ' + order.player_uid : '',
   ];
@@ -581,6 +582,9 @@ function shortenStoredOrderIds() {
 
 function placeResellerOrder(reseller, body, ip) {
   const orderId = String(body.order_id || '').trim().slice(0, 80);
+  const shopOrderNumber = /^[A-Za-z0-9-]{1,32}$/.test(String(body.order_number || '').trim())
+    ? String(body.order_number).trim()
+    : '';
   const playerUid = String(body.player_uid || '').trim();
   const quantity = Math.min(20, Math.max(1, Math.round(Number(body.quantity) || 1)));
   if (!orderId || !/^\d{5,20}$/.test(playerUid)) {
@@ -604,13 +608,13 @@ function placeResellerOrder(reseller, body, ip) {
     }
     const utr = shortOrderUtr(resellerOrderId);
     pg(`INSERT INTO fulfillment_orders
-      (arora_order_utr, player_uid, package_code, package_name, quantity, method_used, status, reseller_id, reseller_order_id, order_price_bdt, ip_address)
+      (arora_order_utr, shop_order_number, player_uid, package_code, package_name, quantity, method_used, status, reseller_id, reseller_order_id, order_price_bdt, ip_address)
       VALUES (
-        ${sqlString(utr)}, ${sqlString(playerUid)}, ${sqlString(pack.package_code)}, ${sqlString(pack.name)},
+        ${sqlString(utr)}, ${sqlString(shopOrderNumber)}, ${sqlString(playerUid)}, ${sqlString(pack.package_code)}, ${sqlString(pack.name)},
         1, 'none', 'QUEUED_EXT', ${Number(reseller.id)}, ${sqlString(resellerOrderId)}, ${unitPrice}, ${sqlString(ip)}
       )`);
-    created.push({ arora_order_utr: utr, status: 'QUEUED_EXT', package_code: pack.package_code, package_name: pack.name });
-    notifyOrderStatus({ arora_order_utr: utr, package_name: pack.name, player_uid: playerUid }, 'QUEUED_EXT', '');
+    created.push({ arora_order_utr: utr, shop_order_number: shopOrderNumber, status: 'QUEUED_EXT', package_code: pack.package_code, package_name: pack.name });
+    notifyOrderStatus({ arora_order_utr: utr, shop_order_number: shopOrderNumber, package_name: pack.name, player_uid: playerUid }, 'QUEUED_EXT', '');
   }
   const first = created[0];
   return {
@@ -646,7 +650,7 @@ function voucherChannel(serial) {
 }
 
 function claimNextTask() {
-  const order = pgOne(`SELECT id, arora_order_utr, player_uid, package_code, package_name, account_id
+  const order = pgOne(`SELECT id, arora_order_utr, shop_order_number, player_uid, package_code, package_name, account_id
     FROM fulfillment_orders
     WHERE status = 'QUEUED_EXT'
     ORDER BY id
@@ -702,7 +706,7 @@ function claimNextTask() {
 }
 
 function requeueOrder(id) {
-  const row = pgOne(`SELECT id, arora_order_utr, player_uid, package_name, status FROM fulfillment_orders WHERE id = ${id} LIMIT 1`);
+  const row = pgOne(`SELECT id, arora_order_utr, shop_order_number, player_uid, package_name, status FROM fulfillment_orders WHERE id = ${id} LIMIT 1`);
   if (!row) return { status: 404, body: { ok: false, error: 'Order not found' } };
   if (row.status === 'COMPLETED') return { status: 400, body: { ok: false, error: 'Completed orders stay completed' } };
   pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
@@ -717,7 +721,7 @@ function requeueOrder(id) {
 function orderActionResult(id, action, body) {
   if (action === 'retry') return requeueOrder(id);
   if (action === 'toggle-pause') {
-    const row = pgOne(`SELECT id, arora_order_utr, player_uid, package_name, status FROM fulfillment_orders WHERE id = ${id} LIMIT 1`);
+    const row = pgOne(`SELECT id, arora_order_utr, shop_order_number, player_uid, package_name, status FROM fulfillment_orders WHERE id = ${id} LIMIT 1`);
     if (!row) return { status: 404, body: { ok: false, error: 'Order not found' } };
     const next = row.status === 'PAUSED' ? 'QUEUED_EXT' : 'PAUSED';
     pg(`UPDATE fulfillment_orders SET status = ${sqlString(next)} WHERE id = ${id}`);
@@ -749,7 +753,7 @@ function finishExtensionOrder(body) {
   const reason = String(body.error_message || body.receipt_note || '').slice(0, 500);
   const receipt = String(body.receipt_note || '').slice(0, 500);
   if (!utr) return;
-  const order = pgOne(`SELECT status, arora_order_utr, player_uid, package_code, package_name, quantity, reseller_order_id, account_id, order_price_bdt
+  const order = pgOne(`SELECT status, arora_order_utr, shop_order_number, player_uid, package_code, package_name, quantity, reseller_order_id, account_id, order_price_bdt
     FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(utr)} LIMIT 1`);
   if (!order) return;
   if (body.release_voucher && status !== 'COMPLETED') {
@@ -993,7 +997,7 @@ function dashboard() {
     ORDER BY id
   `), []);
   const orders = dashQuery('orders', () => pgJson(`
-    SELECT id, arora_order_utr, player_uid, package_code, package_name, quantity,
+    SELECT id, arora_order_utr, shop_order_number, player_uid, package_code, package_name, quantity,
            method_used, status, status_reason, receipt_note, webhook_status, created_at
     FROM fulfillment_orders
     ORDER BY id DESC

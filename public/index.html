@@ -1364,7 +1364,7 @@
             : `<button class="btn btn-secondary btn-sm" onclick="togglePauseOrder(${o.id})" title="Pause Order" style="border-color:rgba(245,183,55,0.7);color:#fbbf24;">${ICONS.pause} Pause</button>`;
           return `
             <tr>
-              <td><code>${o.arora_order_utr}</code></td>
+              <td><code>${esc(o.shop_order_number || o.arora_order_utr)}</code></td>
               <td><code>${o.player_uid}</code></td>
               <td><b>${o.package_name}</b> <code>${o.package_code}</code> ×${o.quantity}</td>
               <td>${mLabel}</td>
