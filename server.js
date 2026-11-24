@@ -607,10 +607,11 @@ async function probeUniqbdWebhook() {
     } catch {
       rejected = false;
     }
+    const answered = response.status === 200 || response.status === 201;
     return {
       ok: true,
       http_status: response.status,
-      route_live: response.status === 200 && rejected,
+      route_live: answered && rejected,
     };
   } catch {
     return { ok: false, error: 'UniQbd did not answer' };
