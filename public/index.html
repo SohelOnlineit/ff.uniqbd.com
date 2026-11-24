@@ -1546,6 +1546,7 @@
             <td data-label="Time" style="color:var(--muted);">${whenText(o.created_at)}</td>
             <td data-label="Action">
               <div class="row-actions">
+                <button type="button" class="tok-eye" data-note="${esc(noteText)}" onclick="showOrderNote(this)" title="Show note">${ICONS.eye}</button>
                 ${o.status === 'COMPLETED'
                   ? '<span style="color:#34d399;font-size:12px;margin-right:4px;">Done</span>'
                   : loginFailed
@@ -1975,6 +1976,11 @@
       });
       showToast(r.ok ? 'Order marked completed.' : 'Action failed.');
       loadDashboard();
+    }
+
+    function showOrderNote(btn) {
+      const note = String(btn.getAttribute('data-note') || '').trim();
+      askNotice('Order note', note && note !== '-' ? note : 'No note for this order.');
     }
 
     async function askNotice(title, text) {
