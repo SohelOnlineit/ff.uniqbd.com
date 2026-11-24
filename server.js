@@ -297,6 +297,31 @@ function matchPackage(input) {
   return found;
 }
 
+function shortOrderUtr(resellerOrderId) {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const digest = crypto.createHash('sha256').update('ff-utr-v1:' + String(resellerOrderId)).digest();
+  let code = 'UQ-';
+  for (let i = 0; i < 8; i += 1) code += alphabet[digest[i] % alphabet.length];
+  const taken = pgOne(`SELECT reseller_order_id FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(code)} LIMIT 1`);
+  if (!taken || String(taken.reseller_order_id || '') === String(resellerOrderId)) return code;
+  for (let n = 0; n < 8; n += 1) {
+    const alt = code + alphabet[digest[8 + n] % alphabet.length];
+    const row = pgOne(`SELECT id FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(alt)} LIMIT 1`);
+    if (!row) return alt;
+  }
+  return code + alphabet[crypto.randomBytes(1)[0] % alphabet.length];
+}
+
+function shortenStoredOrderIds() {
+  const rows = pgJson(`SELECT id, arora_order_utr, reseller_order_id FROM fulfillment_orders WHERE char_length(arora_order_utr) > 16`);
+  for (const row of rows) {
+    const next = shortOrderUtr(row.reseller_order_id || row.arora_order_utr);
+    if (!next || next === row.arora_order_utr) continue;
+    pg(`UPDATE unipin_vouchers SET used_order_utr = ${sqlString(next)} WHERE used_order_utr = ${sqlString(row.arora_order_utr)}`);
+    pg(`UPDATE fulfillment_orders SET arora_order_utr = ${sqlString(next)} WHERE id = ${Number(row.id)} AND arora_order_utr = ${sqlString(row.arora_order_utr)}`);
+  }
+}
+
 function placeResellerOrder(reseller, body, ip) {
   const orderId = String(body.order_id || '').trim().slice(0, 80);
   const playerUid = String(body.player_uid || '').trim();
@@ -320,7 +345,7 @@ function placeResellerOrder(reseller, body, ip) {
       created.push(existing);
       continue;
     }
-    const utr = ('UQ-' + resellerOrderId).slice(0, 80);
+    const utr = shortOrderUtr(resellerOrderId);
     pg(`INSERT INTO fulfillment_orders
       (arora_order_utr, player_uid, package_code, package_name, quantity, method_used, status, reseller_id, reseller_order_id, order_price_bdt, ip_address)
       VALUES (
@@ -940,5 +965,10 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(port, host, () => {
+  try {
+    shortenStoredOrderIds();
+  } catch (err) {
+    console.error('Could not shorten old order ids');
+  }
   console.log('ff.uniqbd.com listening on http://' + host + ':' + port);
 });
