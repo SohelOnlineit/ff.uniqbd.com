@@ -239,6 +239,256 @@ function extensionMatches(req) {
   return crypto.timingSafeEqual(left, right);
 }
 
+function safeEqual(leftValue, rightValue) {
+  const left = Buffer.from(String(leftValue || ''));
+  const right = Buffer.from(String(rightValue || ''));
+  if (!left.length || left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+}
+
+function decryptSecret(stored) {
+  const parts = String(stored || '').split('$');
+  if (parts.length !== 4 || parts[0] !== 'aes256gcm' || !authSecret) return null;
+  try {
+    const key = crypto.scryptSync(authSecret, 'ff-account-v1', 32);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(parts[1], 'base64url'));
+    decipher.setAuthTag(Buffer.from(parts[2], 'base64url'));
+    return Buffer.concat([decipher.update(Buffer.from(parts[3], 'base64url')), decipher.final()]).toString('utf8');
+  } catch {
+    return null;
+  }
+}
+
+function maskCode(value) {
+  const text = String(value || '').replace(/\s+/g, '');
+  if (text.length <= 4) return '****';
+  return text.slice(0, 4) + '*'.repeat(Math.max(4, text.length - 6)) + text.slice(-2);
+}
+
+function resellerRow() {
+  return pgOne(`SELECT id, api_key, api_secret, is_active, webhook_url
+    FROM resellers ORDER BY id LIMIT 1`);
+}
+
+function resellerAuth(req) {
+  const row = resellerRow();
+  if (!row || !Number(row.is_active)) return null;
+  if (!safeEqual(req.headers['x-api-key'], row.api_key) || !safeEqual(req.headers['x-api-secret'], row.api_secret)) {
+    return null;
+  }
+  return row;
+}
+
+function matchPackage(input) {
+  const packages = pgJson('SELECT package_code, name, diamonds, is_active, unipin_uc_cost FROM ff_packages ORDER BY id');
+  const code = String(input.package_code || '').trim().toUpperCase();
+  const label = String(input.package_name || input.name || '').trim().toLowerCase();
+  let found = code ? packages.find((row) => String(row.package_code).toUpperCase() === code) : null;
+  if (!found && /weekly/.test(label)) found = packages.find((row) => row.package_code === 'FF_WEEKLY');
+  if (!found && /monthly/.test(label)) found = packages.find((row) => row.package_code === 'FF_MONTHLY');
+  if (!found) {
+    const named = label.match(/(\d+)/);
+    const diamonds = Number(input.diamonds || (named ? named[1] : 0));
+    if (diamonds) {
+      found = packages.find((row) => Number(row.diamonds) === diamonds && row.package_code !== 'FF_WEEKLY' && row.package_code !== 'FF_MONTHLY');
+    }
+  }
+  if (!found || !Number(found.is_active)) return null;
+  return found;
+}
+
+function placeResellerOrder(reseller, body, ip) {
+  const orderId = String(body.order_id || '').trim().slice(0, 80);
+  const playerUid = String(body.player_uid || '').trim();
+  const quantity = Math.min(20, Math.max(1, Math.round(Number(body.quantity) || 1)));
+  if (!orderId || !/^\d{5,20}$/.test(playerUid)) {
+    return { status: 400, body: { ok: false, error: 'order_id and a numeric player UID are required' } };
+  }
+  const pack = matchPackage(body);
+  if (!pack) return { status: 400, body: { ok: false, error: 'Unknown Free Fire package' } };
+  const priceRow = pgOne(`SELECT price_bdt FROM reseller_prices
+    WHERE reseller_id = ${Number(reseller.id)} AND package_code = ${sqlString(pack.package_code)} LIMIT 1`);
+  const unitPrice = num(priceRow && priceRow.price_bdt);
+  const created = [];
+  for (let index = 1; index <= quantity; index += 1) {
+    const resellerOrderId = quantity === 1 ? orderId : orderId + '#' + index;
+    const existing = pgOne(`SELECT arora_order_utr, status, package_code, package_name
+      FROM fulfillment_orders
+      WHERE reseller_id = ${Number(reseller.id)} AND reseller_order_id = ${sqlString(resellerOrderId)}
+      LIMIT 1`);
+    if (existing) {
+      created.push(existing);
+      continue;
+    }
+    const utr = ('UQ-' + resellerOrderId).slice(0, 80);
+    pg(`INSERT INTO fulfillment_orders
+      (arora_order_utr, player_uid, package_code, package_name, quantity, method_used, status, reseller_id, reseller_order_id, order_price_bdt, ip_address)
+      VALUES (
+        ${sqlString(utr)}, ${sqlString(playerUid)}, ${sqlString(pack.package_code)}, ${sqlString(pack.name)},
+        1, 'none', 'QUEUED_EXT', ${Number(reseller.id)}, ${sqlString(resellerOrderId)}, ${unitPrice}, ${sqlString(ip)}
+      )`);
+    created.push({ arora_order_utr: utr, status: 'QUEUED_EXT', package_code: pack.package_code, package_name: pack.name });
+  }
+  const first = created[0];
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      order_id: orderId,
+      order_utr: first.arora_order_utr,
+      player_uid: playerUid,
+      package_code: pack.package_code,
+      package_name: pack.name,
+      diamonds: Number(pack.diamonds),
+      quantity,
+      order_price_bdt: Math.round(unitPrice * quantity * 100) / 100,
+      status: first.status,
+      message: 'Order queued for the matching Free Fire package.',
+    },
+  };
+}
+
+function splitVoucher(plain) {
+  const parts = String(plain || '').trim().split(/[\s|,]+/).filter(Boolean);
+  if (parts.length >= 2) return { serial: parts[0], pin: parts.slice(1).join('') };
+  return { serial: parts[0] || '', pin: '' };
+}
+
+function voucherChannel(serial) {
+  const prefix = String(serial || '').toUpperCase().startsWith('UPBD') ? 'UPBD' : 'BDMB';
+  return {
+    prefix,
+    channel_name: prefix === 'UPBD' ? 'UP Gift Card' : 'UniPin Voucher',
+  };
+}
+
+function claimNextTask() {
+  const order = pgOne(`SELECT id, arora_order_utr, player_uid, package_code, package_name, account_id
+    FROM fulfillment_orders
+    WHERE status = 'QUEUED_EXT'
+    ORDER BY id
+    LIMIT 1`);
+  if (!order) return null;
+  const voucher = pgOne(`SELECT id, code_encrypted FROM unipin_vouchers
+    WHERE package_code = ${sqlString(order.package_code)} AND lower(status) = 'available' AND code_encrypted LIKE 'aes256gcm$%'
+    ORDER BY id LIMIT 1`);
+  if (voucher) {
+    const plain = decryptSecret(voucher.code_encrypted);
+    const parts = splitVoucher(plain);
+    if (plain && parts.serial && parts.pin) {
+      pg(`UPDATE unipin_vouchers SET status = 'used', used_order_utr = ${sqlString(order.arora_order_utr)}, used_at = CURRENT_TIMESTAMP WHERE id = ${Number(voucher.id)}`);
+      pg(`UPDATE fulfillment_orders SET status = 'IN_PROGRESS_EXT', method_used = 'unipin_voucher', voucher_ids = ${sqlString(String(voucher.id))} WHERE id = ${Number(order.id)}`);
+      const channel = voucherChannel(parts.serial);
+      return {
+        order_utr: order.arora_order_utr,
+        player_uid: order.player_uid,
+        package_name: order.package_name,
+        denom_label: order.package_name,
+        mode: 'unipin_voucher',
+        voucher: {
+          serial: parts.serial,
+          pin: parts.pin,
+          pin_formatted: parts.pin,
+          prefix: channel.prefix,
+          channel_name: channel.channel_name,
+        },
+      };
+    }
+  }
+  const pack = pgOne(`SELECT unipin_uc_cost FROM ff_packages WHERE package_code = ${sqlString(order.package_code)} LIMIT 1`) || {};
+  const account = pgOne(`SELECT id, label, email_encrypted, credentials_encrypted, security_pin_encrypted, balance
+    FROM unipin_loaded_accounts
+    WHERE lower(status) = 'active' AND balance >= ${num(pack.unipin_uc_cost)} AND credentials_encrypted LIKE 'aes256gcm$%'
+    ORDER BY id LIMIT 1`);
+  if (!account) return null;
+  const email = decryptSecret(account.email_encrypted);
+  const password = decryptSecret(account.credentials_encrypted);
+  const pin = decryptSecret(account.security_pin_encrypted);
+  if (!email || !password || !pin) return null;
+  pg(`UPDATE fulfillment_orders SET status = 'IN_PROGRESS_EXT', method_used = 'loaded_account', account_id = ${Number(account.id)} WHERE id = ${Number(order.id)}`);
+  return {
+    order_utr: order.arora_order_utr,
+    player_uid: order.player_uid,
+    package_name: order.package_name,
+    denom_label: order.package_name,
+    mode: 'loaded_account',
+    account: { label: account.label, email, password, security_pin: pin },
+  };
+}
+
+function finishExtensionOrder(body) {
+  const utr = String(body.order_utr || '').trim().slice(0, 80);
+  const allowed = ['COMPLETED', 'PROCESSING', 'PAUSED', 'CANCELLED', 'QUEUED_EXT', 'IN_PROGRESS_EXT'];
+  const status = allowed.includes(body.status) ? body.status : 'PROCESSING';
+  const reason = String(body.error_message || body.receipt_note || '').slice(0, 500);
+  const receipt = String(body.receipt_note || '').slice(0, 500);
+  if (!utr) return;
+  if (body.release_voucher && status !== 'COMPLETED') {
+    pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
+      WHERE used_order_utr = ${sqlString(utr)}`);
+    pg(`UPDATE fulfillment_orders SET voucher_ids = NULL, method_used = 'none', status = 'QUEUED_EXT' WHERE arora_order_utr = ${sqlString(utr)}`);
+    return;
+  }
+  const completed = status === 'COMPLETED' ? ', completed_at = CURRENT_TIMESTAMP' : '';
+  pg(`UPDATE fulfillment_orders
+    SET status = ${sqlString(status)}, status_reason = ${sqlString(reason)}, receipt_note = ${sqlString(receipt)}${completed}
+    WHERE arora_order_utr = ${sqlString(utr)}`);
+  if (status !== 'COMPLETED') return;
+  const order = pgOne(`SELECT arora_order_utr, player_uid, package_code, package_name, quantity, reseller_order_id, account_id, order_price_bdt
+    FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(utr)} LIMIT 1`);
+  if (!order) return;
+  if (order.account_id) {
+    const pack = pgOne(`SELECT unipin_uc_cost FROM ff_packages WHERE package_code = ${sqlString(order.package_code)} LIMIT 1`) || {};
+    pg(`UPDATE unipin_loaded_accounts SET balance = balance - ${num(pack.unipin_uc_cost)} WHERE id = ${Number(order.account_id)}`);
+  }
+  const reseller = resellerRow();
+  if (!reseller || !reseller.webhook_url) return;
+  const uniqbdOrderId = String(order.reseller_order_id || '').split('#')[0].split(':')[0];
+  const payload = JSON.stringify({
+    event: 'order.completed',
+    order_id: order.reseller_order_id,
+    uniqbd_order_id: uniqbdOrderId,
+    status: 'COMPLETED',
+    player_uid: order.player_uid,
+    package_code: order.package_code,
+    package_name: order.package_name,
+    quantity: Number(order.quantity) || 1,
+  });
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = crypto.createHmac('sha256', reseller.api_secret).update(timestamp + '.' + payload).digest('hex');
+  fetch(reseller.webhook_url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Arora-Event': 'order.completed',
+      'X-Arora-Timestamp': timestamp,
+      'X-Arora-Signature': signature,
+    },
+    body: payload,
+  }).then((response) => {
+    pg(`UPDATE fulfillment_orders SET webhook_status = ${sqlString(String(response.status))} WHERE arora_order_utr = ${sqlString(utr)}`);
+  }).catch(() => {
+    pg(`UPDATE fulfillment_orders SET webhook_status = 'failed' WHERE arora_order_utr = ${sqlString(utr)}`);
+  });
+}
+
+function saveVoucherBatch(body) {
+  const pack = matchPackage({ package_code: body.package_code });
+  if (!pack) return { ok: false, error: 'Unknown package' };
+  const lines = String(body.tokens_text || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 200);
+  let added = 0;
+  for (const line of lines) {
+    const hash = crypto.createHash('sha256').update(pack.package_code + '\n' + line).digest('hex');
+    const exists = pgOne('SELECT id FROM unipin_vouchers WHERE code_hash = ' + sqlString(hash));
+    if (exists) continue;
+    pg(`INSERT INTO unipin_vouchers (package_code, code_hash, code_encrypted, masked_code, status)
+      VALUES (${sqlString(pack.package_code)}, ${sqlString(hash)}, ${sqlString(encryptSecret(line))}, ${sqlString(maskCode(line))}, 'available')`);
+    added += 1;
+  }
+  const total = pgOne(`SELECT COUNT(*) AS n FROM unipin_vouchers WHERE package_code = ${sqlString(pack.package_code)} AND lower(status) = 'available'`) || {};
+  return { ok: true, added, total_available: num(total.n) };
+}
+
 function touchExtension(ip) {
   const now = Date.now();
   const saved = pg(`UPDATE extension_status SET last_seen_at = ${now}, last_ip = ${sqlString(ip)} RETURNING key_id`);
@@ -418,7 +668,7 @@ const server = http.createServer(async (req, res) => {
     try {
       if (!extensionMatches(req)) return sendJson(res, 401, { ok: false, error: 'Invalid extension key' });
       touchExtension(clientIp(req));
-      return sendJson(res, 200, { ok: true, task: null });
+      return sendJson(res, 200, { ok: true, task: claimNextTask() });
     } catch (err) {
       console.error('extension poll failed:', dbError(err));
       return sendJson(res, 500, { ok: false, error: 'Extension API failed' });
@@ -429,23 +679,41 @@ const server = http.createServer(async (req, res) => {
     try {
       if (!extensionMatches(req)) return sendJson(res, 401, { ok: false, error: 'Invalid extension key' });
       touchExtension(clientIp(req));
-      const body = JSON.parse(await readBody(req) || '{}');
-      const utr = String(body.order_utr || '').trim().slice(0, 80);
-      const allowed = ['COMPLETED', 'PROCESSING', 'PAUSED', 'CANCELLED', 'QUEUED_EXT', 'IN_PROGRESS_EXT'];
-      const status = allowed.includes(body.status) ? body.status : 'PROCESSING';
-      const reason = String(body.error_message || body.receipt_note || '').slice(0, 500);
-      const receipt = String(body.receipt_note || '').slice(0, 500);
-      if (utr) {
-        const completed = status === 'COMPLETED' ? ', completed_at = CURRENT_TIMESTAMP' : '';
-        pg(`UPDATE fulfillment_orders
-            SET status = ${sqlString(status)}, status_reason = ${sqlString(reason)}, receipt_note = ${sqlString(receipt)}${completed}
-            WHERE arora_order_utr = ${sqlString(utr)}`);
-      }
+      finishExtensionOrder(JSON.parse(await readBody(req) || '{}'));
       return sendJson(res, 200, { ok: true });
     } catch (err) {
       console.error('extension result failed:', dbError(err));
       return sendJson(res, 500, { ok: false, error: 'Extension API failed' });
     }
+  }
+
+  if (pathname === '/api/reseller/v1/order' && req.method === 'POST') {
+    try {
+      const reseller = resellerAuth(req);
+      if (!reseller) return sendJson(res, 401, { ok: false, error: 'Invalid API key' });
+      const result = placeResellerOrder(reseller, JSON.parse(await readBody(req) || '{}'), clientIp(req));
+      return sendJson(res, result.status, result.body);
+    } catch (err) {
+      console.error('reseller order failed:', dbError(err));
+      return sendJson(res, 500, { ok: false, error: 'Order API failed' });
+    }
+  }
+
+  if (pathname === '/admin-api/vouchers/bulk' && req.method === 'POST') {
+    if (!readToken(req)) return sendJson(res, 401, { ok: false });
+    try {
+      return sendJson(res, 200, saveVoucherBatch(JSON.parse(await readBody(req) || '{}')));
+    } catch (err) {
+      console.error('voucher save failed:', dbError(err));
+      return sendJson(res, 500, { ok: false });
+    }
+  }
+
+  const voucherMatch = pathname.match(/^\/admin-api\/vouchers\/(\d+)$/);
+  if (voucherMatch && req.method === 'DELETE') {
+    if (!readToken(req)) return sendJson(res, 401, { ok: false });
+    const removed = pg('DELETE FROM unipin_vouchers WHERE id = ' + Number(voucherMatch[1]) + " AND lower(status) = 'available' RETURNING id");
+    return sendJson(res, removed ? 200 : 404, { ok: Boolean(removed) });
   }
 
   if (pathname === '/admin-api/vouchers') {

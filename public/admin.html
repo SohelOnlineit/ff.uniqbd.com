@@ -7,22 +7,23 @@
   <title>AroraShop Super Admin — Reseller Prices, Wallets &amp; Orders</title>
   <style>
     :root {
-      --bg: #070b10;
-      --surface: #0f1620;
-      --surface2: #151f2d;
-      --border: #223044;
-      --text: #f1f5f9;
+      color-scheme: dark;
+      --bg: #01131a;
+      --surface: #031a22;
+      --surface2: #06212a;
+      --border: #0e2832;
+      --text: #f8fafc;
       --muted: #94a3b8;
-      --accent: #00e699;
-      --accent-dark: #00b87a;
-      --danger: #ef4444;
-      --warn: #f59e0b;
-      --info: #38bdf8;
+      --accent: #26bfb0;
+      --accent-dark: #14a396;
+      --danger: #fb7185;
+      --warn: #fbbf24;
+      --info: #67e8f9;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      background: var(--bg);
+      background: radial-gradient(circle at 0 0, rgba(0,186,199,.18), transparent 32%), var(--bg);
       color: var(--text);
       min-height: 100vh;
       line-height: 1.5;
@@ -40,7 +41,7 @@
     .brand { display: flex; align-items: center; gap: 10px; }
     .brand-badge {
       width: 38px; height: 38px; border-radius: 10px;
-      background: linear-gradient(135deg, #00e699, #0099ff);
+      background: linear-gradient(135deg, #00bac7, #08788c);
       display: flex; align-items: center; justify-content: center; font-weight: 900; color: #051014;
     }
     .brand h1 { font-size: 16px; font-weight: 800; }
@@ -52,9 +53,9 @@
       color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; transition: .15s;
     }
     .btn:hover { border-color: var(--accent); }
-    .btn-primary { background: var(--accent); color: #04120d; border-color: var(--accent); }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
     .btn-primary:hover { background: var(--accent-dark); }
-    .btn-danger { background: rgba(239,68,68,.15); color: #f87171; border-color: rgba(239,68,68,.4); }
+    .btn-danger { background: rgba(244,63,94,.14); color: #fb7185; border-color: rgba(244,63,94,.35); }
     .btn-sm { padding: 5px 10px; font-size: 12px; }
     .container { max-width: 1340px; margin: 0 auto; padding: 22px 20px 60px; }
     .stats-grid {
@@ -62,7 +63,9 @@
       gap: 14px; margin-bottom: 22px;
     }
     .stat-card {
-      background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+      background: radial-gradient(circle at 0 0, rgba(0,186,199,.16), transparent 42%), var(--surface);
+      border: 1px solid rgba(0,186,199,.28); border-radius: 18px; padding: 16px;
+      box-shadow: 0 12px 28px rgba(0,186,199,.08);
     }
     .stat-label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
     .stat-val { font-size: 26px; font-weight: 800; margin-top: 6px; font-variant-numeric: tabular-nums; }
@@ -80,9 +83,9 @@
       border-radius: 999px; font-size: 12px; font-weight: 700;
     }
     .pill-green { background: rgba(16,185,129,.16); color: #34d399; border: 1px solid rgba(16,185,129,.35); }
-    .pill-red { background: rgba(239,68,68,.16); color: #f87171; border: 1px solid rgba(239,68,68,.35); }
-    .pill-amber { background: rgba(245,158,11,.16); color: #fbbf24; border: 1px solid rgba(245,158,11,.35); }
-    .pill-blue { background: rgba(56,189,248,.16); color: #38bdf8; border: 1px solid rgba(56,189,248,.35); }
+    .pill-red { background: rgba(244,63,94,.16); color: #fb7185; border: 1px solid rgba(244,63,94,.35); }
+    .pill-amber { background: rgba(245,183,55,.16); color: #fbbf24; border: 1px solid rgba(245,183,55,.4); }
+    .pill-blue { background: rgba(38,191,176,.16); color: #67e8f9; border: 1px solid rgba(38,191,176,.35); }
     .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
     .dot-on { background: #10b981; box-shadow: 0 0 8px #10b981; }
     .dot-off { background: #ef4444; }
@@ -90,7 +93,7 @@
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; }
     th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
-    tr:hover td { background: rgba(255,255,255,.02); }
+    tr:hover td { background: rgba(0,186,199,.06); }
     .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
     .field { margin-bottom: 12px; }
     .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; font-weight: 600; }
@@ -113,12 +116,30 @@
     .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
     .login-card { width: 100%; max-width: 400px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 26px; }
     .toast {
-      position: fixed; bottom: 20px; right: 20px; background: #0d261e; color: #34d399;
-      border: 1px solid #10b981; padding: 11px 16px; border-radius: 10px; font-size: 13px;
+      position: fixed; bottom: 20px; right: 20px; background: #031a22; color: #f8fafc;
+      border: 1px solid #00bac7; padding: 11px 16px; border-radius: 14px; font-size: 13px;
       font-weight: 600; z-index: 999; display: none;
     }
-    .key-row { display: flex; gap: 8px; }
-    .key-row input { flex: 1; }
+    .key-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .key-row input { flex: 1 1 180px; min-width: 0; }
+    @media (max-width: 720px) {
+      body { overflow-x: clip; }
+      .topbar-inner, .container { padding-left: 12px; padding-right: 12px; }
+      .brand { min-width: 0; align-items: flex-start; }
+      .brand h1 { font-size: 15px; }
+      .brand small { font-size: 11px; }
+      .actions { width: 100%; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .card { padding: 14px 12px; }
+      .card-head { align-items: flex-start; }
+      .tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .tab-btn { white-space: nowrap; flex: 0 0 auto; }
+      .table-wrap { max-width: 100%; }
+      th, td { white-space: nowrap; }
+      .login-wrap { align-items: flex-start; padding-top: 24px; }
+      .login-card { padding: 20px 16px; }
+      input, select, textarea { font-size: 16px; }
+    }
   </style>
 </head>
 <body>

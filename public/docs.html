@@ -7,22 +7,23 @@
   <title>AroraShop API — Public Integration &amp; Webhook Documentation</title>
   <style>
     :root {
-      --bg: #070b10;
-      --surface: #0f1620;
-      --surface2: #151f2d;
-      --border: #223044;
-      --text: #f1f5f9;
+      color-scheme: dark;
+      --bg: #01131a;
+      --surface: #031a22;
+      --surface2: #06212a;
+      --border: #0e2832;
+      --text: #f8fafc;
       --muted: #94a3b8;
-      --accent: #00e699;
-      --accent-dark: #00b87a;
-      --info: #38bdf8;
+      --accent: #26bfb0;
+      --accent-dark: #14a396;
+      --info: #67e8f9;
       --warn: #fbbf24;
-      --danger: #f87171;
+      --danger: #fb7185;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      background: var(--bg);
+      background: radial-gradient(circle at 0 0, rgba(0,186,199,.18), transparent 32%), var(--bg);
       color: var(--text);
       line-height: 1.6;
       min-height: 100vh;
@@ -57,8 +58,26 @@
       display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 26px;
     }
     @media (max-width: 860px) {
-      .layout { grid-template-columns: 1fr; }
-      .sidebar { display: none; }
+      .topbar-inner, .layout { padding-left: 12px; padding-right: 12px; }
+      .layout { grid-template-columns: 1fr; gap: 14px; padding-top: 14px; }
+      .brand { min-width: 0; }
+      .brand h1 { font-size: 15px; }
+      .brand small { display: none; }
+      .sidebar {
+        position: static;
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 8px;
+      }
+      .sidebar h4 { display: none; }
+      .sidebar a { white-space: nowrap; margin: 0; flex: 0 0 auto; }
+      .card { padding: 16px 12px; }
+      p, li, a { overflow-wrap: anywhere; }
+      pre { font-size: 11px; }
+      table { display: block; width: 100%; overflow-x: auto; }
+      th, td { white-space: nowrap; }
     }
     .sidebar {
       position: sticky; top: 82px; align-self: start;

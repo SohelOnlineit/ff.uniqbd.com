@@ -8,25 +8,31 @@
   <title>AroraShop API</title>
   <style>
     :root {
-      --bg: #090d12;
-      --surface: #111720;
-      --surface-2: #17202c;
-      --border: rgba(255, 255, 255, 0.08);
-      --border-strong: rgba(255, 255, 255, 0.14);
-      --text: #f1f5f9;
-      --muted: #8b9bb0;
-      --accent: #15b48b;
-      --accent-hover: #119b77;
-      --warn: #f59e0b;
-      --danger: #ef4444;
-      --info: #3b82f6;
+      color-scheme: dark;
+      --bg: #01131a;
+      --surface: #031a22;
+      --surface-2: #06212a;
+      --border: #0e2832;
+      --border-strong: #1a4d5c;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #26bfb0;
+      --accent-hover: #14a396;
+      --accent-ink: #042f2e;
+      --side: #021016;
+      --side-text: #e8fffb;
+      --warn: #fbbf24;
+      --danger: #fb7185;
+      --info: #67e8f9;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
+      background:
+        radial-gradient(circle at 0 0, rgba(0, 186, 199, 0.18), transparent 32%),
+        var(--bg);
       color: var(--text);
       min-height: 100vh;
       line-height: 1.45;
@@ -34,7 +40,7 @@
     }
 
     .hidden { display: none !important; }
-    .container { max-width: 1220px; margin: 0 auto; padding: 18px 16px 40px; }
+    .container { max-width: none; margin: 0; padding: 0 4px 28px; }
 
     /* SVG Icon helper */
     .ico {
@@ -60,12 +66,14 @@
     }
     .login-card {
       width: 100%;
-      max-width: 370px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 26px 24px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+      max-width: 390px;
+      background:
+        radial-gradient(circle at 0 0, rgba(38, 191, 176, 0.16), transparent 42%),
+        var(--surface);
+      border: 1px solid rgba(38, 191, 176, 0.32);
+      border-radius: 22px;
+      padding: 28px 24px;
+      box-shadow: 0 0 0 1px rgba(0, 186, 199, 0.06), 0 18px 40px rgba(0, 186, 199, 0.14);
     }
     .login-head {
       display: flex;
@@ -77,8 +85,8 @@
       width: 34px;
       height: 34px;
       border-radius: 10px;
-      background: rgba(21, 180, 139, 0.14);
-      border: 1px solid rgba(21, 180, 139, 0.35);
+      background: rgba(0, 186, 199, 0.12);
+      border: 1px solid rgba(0, 186, 199, 0.35);
       color: var(--accent);
       display: inline-flex;
       align-items: center;
@@ -98,16 +106,16 @@
     }
     input, select, textarea {
       width: 100%;
-      background: var(--bg);
+      background: #02141b;
       border: 1px solid var(--border);
       color: var(--text);
-      border-radius: 10px;
+      border-radius: 12px;
       padding: 10px 12px;
       font-size: 14px;
       outline: none;
-      transition: border-color 0.15s;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
-    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0, 186, 199, 0.16); }
     textarea { min-height: 112px; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 13px; }
 
     .btn {
@@ -127,10 +135,10 @@
     }
     .btn-primary { background: var(--accent); color: #fff; }
     .btn-primary:hover { background: var(--accent-hover); }
-    .btn-secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
-    .btn-secondary:hover { border-color: var(--border-strong); }
-    .btn-danger { background: rgba(239, 68, 68, 0.13); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
-    .btn-danger:hover { background: rgba(239, 68, 68, 0.22); }
+    .btn-secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); }
+    .btn-secondary:hover { border-color: var(--accent); color: #5eead4; }
+    .btn-danger { background: rgba(228, 0, 20, 0.08); color: var(--danger); border: 1px solid rgba(228, 0, 20, 0.28); }
+    .btn-danger:hover { background: rgba(228, 0, 20, 0.14); }
     .btn-sm { padding: 7px 11px; font-size: 12px; border-radius: 8px; }
     .w-full { width: 100%; }
 
@@ -139,13 +147,16 @@
       position: sticky;
       top: 0;
       z-index: 40;
-      background: #111720;
-      border-bottom: 1px solid var(--border);
-      padding: 12px 16px;
+      background: rgba(4, 27, 35, 0.92);
+      border: 1px solid rgba(0, 186, 199, 0.28);
+      border-radius: 18px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      backdrop-filter: blur(8px);
     }
     .topbar-inner {
-      max-width: 1220px;
-      margin: 0 auto;
+      max-width: none;
+      margin: 0;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -168,20 +179,27 @@
       background: var(--accent);
       display: inline-block;
     }
-    .topbar-actions { display: flex; gap: 7px; align-items: center; }
+    .topbar-actions { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+    .app-shell > div { min-width: 0; }
+    #extLiveBadge { max-width: 100%; }
 
     /* KPI Stats */
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 12px;
-      margin: 16px 0 18px;
+      margin: 0 0 16px;
     }
     .stat-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 0 0, rgba(38, 191, 176, 0.16), transparent 42%),
+        var(--surface);
+      border: 1px solid rgba(38, 191, 176, 0.28);
+      border-radius: 18px;
       padding: 14px 15px;
+      box-shadow: 0 0 0 1px rgba(0, 186, 199, 0.05), 0 12px 28px rgba(0, 186, 199, 0.08);
     }
     .stat-top {
       display: flex;
@@ -193,52 +211,131 @@
       margin-bottom: 8px;
     }
     .stat-val { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
-    .c-green { color: var(--accent); }
-    .c-amber { color: var(--warn); }
-    .c-blue { color: var(--info); }
+    .c-green { color: #34d399; }
+    .c-amber { color: #fbbf24; }
+    .c-blue { color: #67e8f9; }
 
     /* Tabs */
-    .tabs {
+    .app-shell {
+      display: grid;
+      grid-template-columns: 248px minmax(0, 1fr);
+      gap: 16px;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .side {
+      position: sticky;
+      top: 16px;
+      align-self: start;
+      height: calc(100vh - 32px);
+      overflow: auto;
+      background: var(--side);
+      color: var(--side-text);
+      border: 1px solid rgba(45, 212, 191, 0.42);
+      border-radius: 22px;
+      padding: 16px 12px;
+      box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.08), 0 16px 36px rgba(0, 20, 24, 0.18);
+    }
+    .side-brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px 14px; }
+    .side-brand strong { display: block; font-size: 14px; }
+    .side-brand span { display: block; color: rgba(232, 255, 251, 0.62); font-size: 11px; }
+    .side-label {
       display: flex;
-      gap: 8px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
-      padding-bottom: 12px;
-      margin-bottom: 16px;
-      border-bottom: 1px solid var(--border);
-    }
-    .tabs::-webkit-scrollbar { display: none; }
-    .tab-btn {
-      display: inline-flex;
       align-items: center;
-      gap: 7px;
-      background: var(--surface);
-      color: var(--muted);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 8px 13px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-      flex-shrink: 0;
-      transition: color 0.15s, background 0.15s, border-color 0.15s;
+      gap: 8px;
+      margin: 4px 6px 8px;
+      color: rgba(232, 255, 251, 0.55);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
-    .tab-btn:hover { color: var(--text); border-color: var(--border-strong); }
+    .side-label::after { content: ""; flex: 1; height: 1px; background: rgba(232, 255, 251, 0.16); }
+    .tabs {
+      display: grid;
+      gap: 8px;
+      overflow: visible;
+      padding: 0;
+      margin: 0;
+      border: 0;
+    }
+    .tab-btn {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      min-height: 42px;
+      background: rgba(225, 251, 253, 0.06);
+      color: var(--side-text);
+      border: 1px solid rgba(232, 255, 251, 0.12);
+      border-radius: 12px;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-weight: 650;
+      cursor: pointer;
+      text-align: left;
+    }
+    .tab-btn .ico { width: 28px; height: 28px; padding: 6px; border-radius: 8px; border: 1px solid rgba(0, 186, 199, 0.35); background: rgba(0, 186, 199, 0.12); color: var(--accent); }
+    .tab-btn:hover { border-color: rgba(0, 186, 199, 0.45); }
     .tab-btn.active {
-      background: rgba(21, 180, 139, 0.14);
+      background: rgba(0, 186, 199, 0.16);
+      color: #7af0f6;
+      border-color: rgba(0, 186, 199, 0.55);
+    }
+    .tab-btn.active::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 8px;
+      bottom: 8px;
+      width: 3px;
+      border-radius: 0 3px 3px 0;
+      background: var(--accent);
+    }
+    .hello {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 14px;
+      padding: 16px 18px;
+      border: 1px solid rgba(0, 186, 199, 0.32);
+      border-radius: 18px;
+      background:
+        radial-gradient(circle at 0 0, rgba(38, 191, 176, 0.18), transparent 42%),
+        var(--surface);
+      box-shadow: 0 0 0 1px rgba(0, 186, 199, 0.06), 0 14px 32px rgba(0, 186, 199, 0.1);
+    }
+    .hello-mark {
+      display: grid;
+      place-items: center;
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      border: 1px solid rgba(0, 186, 199, 0.45);
       color: var(--accent);
-      border-color: rgba(21, 180, 139, 0.45);
+      background: rgba(38, 191, 176, 0.12);
+      font-weight: 800;
+    }
+    .hello p { margin: 0; color: var(--muted); font-size: 13px; }
+    .hello h1 { margin: 2px 0 0; font-size: 28px; letter-spacing: -0.03em; }
+    .hello-date {
+      margin-left: auto;
+      padding: 8px 12px;
+      border: 1px solid rgba(0, 186, 199, 0.35);
+      border-radius: 12px;
+      font-size: 13px;
+      box-shadow: 0 0 18px rgba(0, 186, 199, 0.12);
     }
 
     /* Cards & Grid */
     .card {
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
+      border: 1px solid rgba(38, 191, 176, 0.22);
+      border-radius: 18px;
       padding: 16px;
       margin-bottom: 16px;
+      box-shadow: 0 10px 26px rgba(0, 186, 199, 0.06);
     }
     .card-head {
       display: flex;
@@ -246,7 +343,9 @@
       justify-content: space-between;
       gap: 10px;
       margin-bottom: 14px;
+      flex-wrap: wrap;
     }
+    .card-head > div { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
     .card-title {
       display: flex;
       align-items: center;
@@ -258,6 +357,7 @@
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
     /* Tables */
+    .container, .tab-pane, .card, .grid-2, .table-wrap { min-width: 0; max-width: 100%; }
     .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th, td {
@@ -276,11 +376,11 @@
     }
     tbody tr:last-child td { border-bottom: none; }
     code {
-      background: rgba(255, 255, 255, 0.06);
+      background: rgba(0, 186, 199, 0.1);
       padding: 2px 6px;
       border-radius: 6px;
       font-size: 12px;
-      color: #a7f3d0;
+      color: #5eead4;
     }
 
     /* Badges */
@@ -293,10 +393,10 @@
       font-size: 11px;
       font-weight: 600;
     }
-    .pill-green { background: rgba(21, 180, 139, 0.15); color: #34d399; }
-    .pill-amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-    .pill-red { background: rgba(239, 68, 68, 0.15); color: #f87171; }
-    .pill-blue { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+    .pill-green { background: rgba(16, 185, 129, 0.16); color: #34d399; }
+    .pill-amber { background: rgba(245, 183, 55, 0.16); color: #fbbf24; }
+    .pill-red { background: rgba(244, 63, 94, 0.16); color: #fb7185; }
+    .pill-blue { background: rgba(38, 191, 176, 0.16); color: #67e8f9; }
 
     .sec-list { list-style: none; display: flex; flex-direction: column; gap: 11px; }
     .sec-row {
@@ -305,7 +405,7 @@
       justify-content: space-between;
       gap: 10px;
       padding: 10px 12px;
-      background: var(--bg);
+      background: var(--surface-2);
       border: 1px solid var(--border);
       border-radius: 10px;
       font-size: 13px;
@@ -318,33 +418,84 @@
       bottom: 18px;
       right: 18px;
       left: auto;
-      background: var(--surface-2);
+      background: var(--surface);
       border: 1px solid var(--accent);
       color: var(--text);
       padding: 11px 16px;
-      border-radius: 10px;
+      border-radius: 14px;
       font-size: 13px;
       z-index: 9999;
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 12px 32px rgba(0, 186, 199, 0.18);
       max-width: 340px;
     }
 
+    .key-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .key-row input { flex: 1 1 180px; min-width: 0; width: auto; }
+
     /* Responsive Mobile Polish */
     @media (max-width: 960px) {
-      .stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .app-shell { grid-template-columns: 1fr; padding: 10px; gap: 10px; }
+      .side {
+        position: sticky;
+        top: 8px;
+        z-index: 50;
+        height: auto;
+        padding: 10px;
+      }
+      .side-label { display: none; }
+      .side-brand { padding: 0 4px 8px; }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .tabs::-webkit-scrollbar { display: none; }
+      .tab-btn { width: auto; flex: 0 0 auto; white-space: nowrap; }
+      .topbar-inner { flex-wrap: wrap; }
+      .topbar-actions { width: 100%; justify-content: flex-start; }
+      .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .grid-2 { grid-template-columns: 1fr; }
+      .grid-2.pair { grid-template-columns: 1fr 1fr; }
+      .hello { flex-wrap: wrap; }
+      .hello-date { margin-left: 0; }
     }
     @media (max-width: 600px) {
-      .container { padding: 14px 12px 32px; }
-      .topbar { padding: 10px 12px; }
-      .topbar-title { font-size: 14px; }
+      body { overflow-x: clip; }
+      .app-shell { padding: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+      .container { padding: 0; }
+      .topbar { padding: 10px 12px; border-radius: 14px; }
+      .hello { padding: 12px 14px; }
+      .hello h1 { font-size: 22px; }
+      .hello-mark { width: 40px; height: 40px; }
+      .hello-date { display: none; }
       .btn-label-hide { display: none; }
-      .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+      .tabs {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        overflow: visible;
+      }
+      .tab-btn { width: 100%; justify-content: flex-start; padding: 8px 8px; font-size: 12px; white-space: nowrap; }
+      .tab-btn .ico { width: 22px; height: 22px; padding: 4px; }
+      #extLiveBadge { flex: 1 1 100%; }
+      .stats-grid { gap: 8px; }
       .stat-card:last-child { grid-column: 1 / -1; }
+      .stat-card { padding: 12px; }
       .stat-val { font-size: 20px; }
+      .stat-top { font-size: 11px; }
       .card { padding: 14px 12px; }
+      .card-head .card-sub { width: 100%; }
+      th, td { padding: 8px; font-size: 12px; }
+      .sec-row { flex-wrap: wrap; align-items: flex-start; }
+      .login-card { padding: 22px 16px; }
       input, select, textarea { font-size: 16px; }
-      .toast { left: 12px; right: 12px; bottom: 14px; max-width: none; }
+      .toast {
+        left: 12px;
+        right: 12px;
+        bottom: calc(14px + env(safe-area-inset-bottom));
+        max-width: none;
+      }
     }
   </style>
 </head>
@@ -367,7 +518,7 @@
           <label for="loginPass">Password</label>
           <input type="password" id="loginPass" required autocomplete="current-password" placeholder="Enter password" />
         </div>
-        <div id="loginErr" style="color:#f87171;font-size:12px;margin-bottom:10px;"></div>
+        <div id="loginErr" style="color:#fb7185;font-size:12px;margin-bottom:10px;"></div>
         <button type="submit" class="btn btn-primary w-full">
           <svg class="ico" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
           Sign In
@@ -378,26 +529,55 @@
 
   <!-- DASHBOARD VIEW -->
   <div id="appView" class="hidden">
+    <div class="app-shell">
+    <aside class="side">
+      <div class="side-brand">
+        <img src="/logo.png" alt="AroraShop" style="height:36px;width:auto;display:block;object-fit:contain;background:#fff;border-radius:10px;padding:4px;" />
+        <div>
+          <strong>AroraShop</strong>
+          <span>Free Fire Desk</span>
+        </div>
+      </div>
+      <div class="side-label">Desk</div>
+      <nav class="tabs" aria-label="Dashboard Sections">
+        <button class="tab-btn active" onclick="switchTab('orders', this)">
+          <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Orders
+        </button>
+        <button class="tab-btn" onclick="switchTab('vouchers', this)">
+          <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/></svg>
+          Tokens
+        </button>
+        <button class="tab-btn" onclick="switchTab('accounts', this)">
+          <svg class="ico ico-sm" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          Accounts
+        </button>
+        <button class="tab-btn" onclick="switchTab('packages', this)">
+          <svg class="ico ico-sm" viewBox="0 0 24 24"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+          Packages
+        </button>
+        <button class="tab-btn" onclick="switchTab('security', this)">
+          <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Security
+        </button>
+      </nav>
+    </aside>
+    <div>
     <header class="topbar">
       <div class="topbar-inner">
         <div class="topbar-brand">
-          <img src="/logo.png" alt="AroraShop" style="height:34px;width:auto;display:block;object-fit:contain;" />
           <div>
-            <div class="topbar-title">API Engine</div>
+            <div class="topbar-title">Overview</div>
             <div class="topbar-status"><span class="dot-live"></span> Secure Engine</div>
           </div>
         </div>
         <div class="topbar-actions">
-          <span id="extLiveBadge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:700;background:rgba(239,68,68,.14);color:#f87171;border:1px solid rgba(239,68,68,.35);">
+          <span id="extLiveBadge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:12px;font-weight:700;background:rgba(244,63,94,.16);color:#fb7185;border:1px solid rgba(244,63,94,.35);">
             <span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
             Extension Offline
           </span>
-          <a href="/docs" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none;" title="Public API & Webhook Documentation">
-            <span class="btn-label-hide">API Docs</span>
-          </a>
-          <a href="/admin" class="btn btn-primary btn-sm" style="text-decoration:none;" title="Manage API Resellers & Users">
-            <span class="btn-label-hide">Reseller Admin</span>
-          </a>
+          <a href="/docs" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none;" title="Public API & Webhook Documentation">Docs</a>
+          <a href="/admin" class="btn btn-primary btn-sm" style="text-decoration:none;" title="Manage API Resellers & Users">Admin</a>
           <button class="btn btn-secondary btn-sm" onclick="testTelegram()" title="Test Telegram">
             <svg class="ico ico-sm" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             <span class="btn-label-hide">Telegram</span>
@@ -415,7 +595,14 @@
     </header>
 
     <main class="container">
-      <!-- KPI Stats -->
+      <section class="hello">
+        <div class="hello-mark">A</div>
+        <div>
+          <p>Hello, aroraadmin</p>
+          <h1>Free Fire Desk</h1>
+        </div>
+        <div class="hello-date" id="helloDate"></div>
+      </section>
       <section class="stats-grid">
         <div class="stat-card">
           <div class="stat-top">
@@ -453,30 +640,6 @@
           <div class="stat-val c-green" id="stBal">0</div>
         </div>
       </section>
-
-      <!-- Tabs -->
-      <nav class="tabs" aria-label="Dashboard Sections">
-        <button class="tab-btn active" onclick="switchTab('orders', this)">
-          <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          Orders
-        </button>
-        <button class="tab-btn" onclick="switchTab('vouchers', this)">
-          <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/></svg>
-          Tokens
-        </button>
-        <button class="tab-btn" onclick="switchTab('accounts', this)">
-          <svg class="ico ico-sm" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-          Accounts
-        </button>
-        <button class="tab-btn" onclick="switchTab('packages', this)">
-          <svg class="ico ico-sm" viewBox="0 0 24 24"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
-          Packages
-        </button>
-        <button class="tab-btn" onclick="switchTab('security', this)">
-          <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          Security & Test
-        </button>
-      </nav>
 
       <!-- TAB 1: ORDERS -->
       <section id="tab-orders" class="tab-pane">
@@ -616,7 +779,7 @@
                 <label for="accPin">6-Digit Security PIN</label>
                 <input type="password" id="accPin" required maxlength="6" pattern="[0-9]{6}" inputmode="numeric" placeholder="6-digit PIN" />
               </div>
-              <div class="grid-2" style="gap:10px;">
+              <div class="grid-2 pair" style="gap:10px;">
                 <div class="field">
                   <label for="accBal">Balance (UP)</label>
                   <input type="number" step="0.01" id="accBal" required value="1000" />
@@ -729,7 +892,7 @@
             </div>
             <div class="field" style="margin-bottom:14px;">
               <label>Extension Secret Key (Paste inside Extension Popup)</label>
-              <div style="display:flex;gap:8px;">
+              <div class="key-row">
                 <input type="text" id="extKeyBox" readonly style="font-family:monospace;font-size:12px;" />
                 <button type="button" class="btn btn-secondary btn-sm" onclick="copyExtKey()">Copy Key</button>
               </div>
@@ -739,6 +902,8 @@
         </div>
       </section>
     </main>
+    </div>
+    </div>
   </div>
 
   <div id="toast" class="toast hidden"></div>
@@ -820,6 +985,8 @@
         document.getElementById('appView').classList.remove('hidden');
         const lastTab = localStorage.getItem('arora_active_tab') || 'orders';
         switchTab(lastTab, null);
+        const helloDate = document.getElementById('helloDate');
+        if (helloDate) helloDate.textContent = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
         loadDashboard();
       } else {
         localStorage.removeItem('arora_admin_token');
@@ -871,14 +1038,14 @@
           ? Math.max(0, Math.floor((Date.now() - Number(d.extension_status.last_seen_at)) / 1000))
           : null;
         if (isOnline) {
-          extBadge.style.background = 'rgba(16,185,129,.16)';
+          extBadge.style.background = 'rgba(16,185,129,.14)';
           extBadge.style.color = '#34d399';
           extBadge.style.borderColor = 'rgba(16,185,129,.4)';
           extBadge.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;box-shadow:0 0 8px #10b981;"></span> Extension Online (${ago !== null ? ago + 's ago' : 'Live'})`;
         } else {
-          extBadge.style.background = 'rgba(239,68,68,.14)';
-          extBadge.style.color = '#f87171';
-          extBadge.style.borderColor = 'rgba(239,68,68,.35)';
+          extBadge.style.background = 'rgba(228,0,20,.1)';
+          extBadge.style.color = '#fb7185';
+          extBadge.style.borderColor = 'rgba(228,0,20,.28)';
           const lastTxt = ago !== null ? (ago > 3600 ? Math.floor(ago/3600) + 'h ago' : Math.floor(ago/60) + 'm ago') : 'Never';
           extBadge.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;"></span> Extension Offline (${lastTxt})`;
         }
@@ -966,8 +1133,8 @@
             : `<span style="display:inline-flex;align-items:center;gap:5px;color:var(--muted);">${ICONS.clock} Pending</span>`;
           const noteText = o.receipt_note || o.status_reason || '-';
           const pauseBtnHtml = o.status === 'PAUSED'
-            ? `<button class="btn btn-secondary btn-sm" onclick="togglePauseOrder(${o.id})" title="Resume Order" style="border-color:rgba(59,130,246,0.45);color:#60a5fa;">${ICONS.play} Resume</button>`
-            : `<button class="btn btn-secondary btn-sm" onclick="togglePauseOrder(${o.id})" title="Pause Order" style="border-color:rgba(245,158,11,0.45);color:#fbbf24;">${ICONS.pause} Pause</button>`;
+            ? `<button class="btn btn-secondary btn-sm" onclick="togglePauseOrder(${o.id})" title="Resume Order" style="border-color:rgba(0,186,199,0.55);color:#08788c;">${ICONS.play} Resume</button>`
+            : `<button class="btn btn-secondary btn-sm" onclick="togglePauseOrder(${o.id})" title="Pause Order" style="border-color:rgba(245,183,55,0.7);color:#fbbf24;">${ICONS.pause} Pause</button>`;
           return `
             <tr>
               <td><code>${o.arora_order_utr}</code></td>
