@@ -246,7 +246,7 @@
 
     bar.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <strong style="color:#15b48b;font-size:13px;">AroraShop Helper v1.4.7</strong>
+        <strong style="color:#15b48b;font-size:13px;">UniQbd</strong>
         <span style="background:rgba(21,180,139,0.16);color:#34d399;padding:2px 7px;border-radius:99px;font-size:11px;font-weight:600;">${shownOrder(task)}</span>
       </div>
       <div style="color:#cbd5e1;margin-bottom:4px;">UID: <b>${task.player_uid}</b> &bull; <b>${task.denom_label}</b></div>
