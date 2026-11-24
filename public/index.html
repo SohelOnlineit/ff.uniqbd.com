@@ -185,6 +185,7 @@
       gap: 10px;
     }
     .topbar-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .nav-toggle, .drawer-head, .nav-back { display: none; }
     .topbar-title { font-size: 15px; font-weight: 700; white-space: nowrap; }
     .topbar-status {
       display: inline-flex;
@@ -639,24 +640,96 @@
     /* Responsive Mobile Polish */
     @media (max-width: 960px) {
       .app-shell { grid-template-columns: 1fr; padding: 10px; gap: 10px; }
+      .nav-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        flex: 0 0 auto;
+        border: 1px solid rgba(38, 191, 176, 0.28);
+        border-radius: 12px;
+        background: #021820;
+        color: #f8fafc;
+        cursor: pointer;
+      }
+      .nav-back {
+        position: fixed;
+        inset: 0;
+        z-index: 70;
+        border: 0;
+        background: rgba(0, 0, 0, 0.55);
+      }
+      body.nav-open .nav-back { display: block; }
       .side {
-        position: sticky;
-        top: 8px;
-        z-index: 50;
-        height: auto;
-        padding: 10px;
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 80;
+        width: min(20.5rem, 88vw);
+        height: 100%;
+        margin: 0;
+        padding: 8px 8px 18px;
+        border: 0;
+        border-right: 1px solid rgba(38, 191, 176, 0.18);
+        border-radius: 0;
+        box-shadow: none;
+        transform: translateX(-105%);
+        visibility: hidden;
+        transition: transform 0.2s ease;
       }
-      .side-label { display: none; }
-      .side-brand { padding: 0 4px 8px; }
-      .tabs {
+      body.nav-open .side { transform: translateX(0); visibility: visible; }
+      .drawer-head {
         display: flex;
-        gap: 8px;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 8px 2px;
       }
-      .tabs::-webkit-scrollbar { display: none; }
-      .tab-btn { width: auto; flex: 0 0 auto; white-space: nowrap; }
+      .drawer-head p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      .drawer-close {
+        width: 32px;
+        height: 32px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 22px;
+        line-height: 1;
+        cursor: pointer;
+      }
+      .side-brand { display: none; }
+      .side-label { display: flex; margin-top: 8px; }
+      .tabs { display: flex; flex-direction: column; gap: 2px; overflow: visible; }
+      .tab-btn {
+        width: 100%;
+        min-height: 42px;
+        padding: 6px 8px;
+        border-color: transparent;
+        border-radius: 11px;
+        font-size: 15px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .tab-btn .ico { width: 32px; height: 32px; padding: 8px; border: 0; border-radius: 8px; }
+      .tab-btn.active {
+        background: rgba(38, 191, 176, 0.16);
+        border-color: transparent;
+        box-shadow: inset 3px 0 0 var(--nav-tone, #26bfb0);
+      }
+      .tab-btn.active .ico {
+        background: color-mix(in srgb, var(--nav-tone, #26bfb0) 16%, transparent);
+        color: var(--nav-tone, #26bfb0);
+      }
+      .tab-btn.active::before { content: none; }
       .topbar-inner { flex-wrap: wrap; }
       .topbar-actions { width: 100%; justify-content: flex-start; }
       .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -674,13 +747,9 @@
       .container { padding: 0; }
       .topbar { padding: 10px 12px; border-radius: 14px; }
       .btn-label-hide { display: none; }
-      .tabs {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        overflow: visible;
-      }
-      .tab-btn { width: 100%; justify-content: flex-start; padding: 8px 8px; font-size: 12px; white-space: nowrap; }
-      .tab-btn .ico { width: 22px; height: 22px; padding: 4px; }
+      .tabs { display: flex; flex-direction: column; }
+      .tab-btn { width: 100%; font-size: 15px; padding: 6px 8px; }
+      .tab-btn .ico { width: 32px; height: 32px; padding: 8px; }
       #extLiveBadge { flex: 1 1 100%; }
       .stats-grid { gap: 8px; }
       .stat-card:last-child { grid-column: 1 / -1; }
@@ -807,8 +876,13 @@
 
   <!-- DASHBOARD VIEW -->
   <div id="appView" class="hidden">
+    <button type="button" class="nav-back" id="navBack" aria-label="Close menu"></button>
     <div class="app-shell">
-    <aside class="side">
+    <aside class="side" id="sideNav">
+      <div class="drawer-head">
+        <p>Menu</p>
+        <button type="button" class="drawer-close" id="navClose" aria-label="Close menu">&times;</button>
+      </div>
       <div class="side-brand">
         <img src="/logo.webp" alt="FF.UniQbd" />
         <div>
@@ -844,6 +918,9 @@
     <header class="topbar">
       <div class="topbar-inner">
         <div class="topbar-brand">
+          <button type="button" class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false">
+            <svg class="ico" viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+          </button>
           <div>
             <div class="topbar-title">Dashboard</div>
             <div class="topbar-status"><span class="dot-live"></span> Secure Engine</div>
@@ -1442,8 +1519,32 @@
       const title = document.querySelector('.topbar-title');
       if (title) title.textContent = titles[name] || 'Overview';
       localStorage.setItem('arora_active_tab', name);
+      setNavOpen(false);
       if (name === 'vouchers') loadVouchers();
     }
+
+    function setNavOpen(open) {
+      const show = Boolean(open) && window.innerWidth <= 960;
+      document.body.classList.toggle('nav-open', show);
+      const btn = document.getElementById('navToggle');
+      if (btn) {
+        btn.setAttribute('aria-expanded', show ? 'true' : 'false');
+        btn.setAttribute('aria-label', show ? 'Close menu' : 'Open menu');
+      }
+      document.body.style.overflow = show ? 'hidden' : '';
+    }
+
+    document.getElementById('navToggle').addEventListener('click', () => {
+      setNavOpen(!document.body.classList.contains('nav-open'));
+    });
+    document.getElementById('navBack').addEventListener('click', () => setNavOpen(false));
+    document.getElementById('navClose').addEventListener('click', () => setNavOpen(false));
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') setNavOpen(false);
+    });
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 960) setNavOpen(false);
+    });
 
     function maskSecret(value) {
       const key = String(value || '');
