@@ -302,44 +302,6 @@
       border-radius: 0 3px 3px 0;
       background: var(--accent);
     }
-    .hello {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      margin-bottom: 14px;
-      padding: 16px 18px;
-      border: 1px solid rgba(0, 186, 199, 0.32);
-      border-radius: 18px;
-      background:
-        radial-gradient(circle at 0 0, rgba(38, 191, 176, 0.18), transparent 42%),
-        var(--surface);
-      box-shadow: 0 0 0 1px rgba(0, 186, 199, 0.06), 0 14px 32px rgba(0, 186, 199, 0.1);
-    }
-    .hello-logo { height: 46px; width: auto; max-width: 190px; object-fit: contain; display: block; }
-    .hello-brand { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1px; }
-    .hello-brand strong { font-size: 18px; letter-spacing: -0.03em; }
-    .hello-brand span { color: var(--muted); font-size: 12px; }
-    .hello-mark {
-      display: grid;
-      place-items: center;
-      width: 48px;
-      height: 48px;
-      border-radius: 16px;
-      border: 1px solid rgba(0, 186, 199, 0.45);
-      color: var(--accent);
-      background: rgba(38, 191, 176, 0.12);
-      font-weight: 800;
-    }
-    .hello p { margin: 0; color: var(--muted); font-size: 13px; }
-    .hello h1 { margin: 2px 0 0; font-size: 28px; letter-spacing: -0.03em; }
-    .hello-date {
-      margin-left: auto;
-      padding: 8px 12px;
-      border: 1px solid rgba(0, 186, 199, 0.35);
-      border-radius: 12px;
-      font-size: 13px;
-      box-shadow: 0 0 18px rgba(0, 186, 199, 0.12);
-    }
 
     /* Cards & Grid */
     .card {
@@ -493,18 +455,12 @@
       .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .grid-2 { grid-template-columns: 1fr; }
       .grid-2.pair { grid-template-columns: 1fr 1fr; }
-      .hello { flex-wrap: wrap; }
-      .hello-date { margin-left: 0; }
     }
     @media (max-width: 600px) {
       body { overflow-x: clip; }
       .app-shell { padding: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
       .container { padding: 0; }
       .topbar { padding: 10px 12px; border-radius: 14px; }
-      .hello { padding: 12px 14px; }
-      .hello h1 { font-size: 22px; }
-      .hello-mark { width: 40px; height: 40px; }
-      .hello-date { display: none; }
       .btn-label-hide { display: none; }
       .tabs {
         display: grid;
@@ -628,17 +584,6 @@
     </header>
 
     <main class="container">
-      <section class="hello">
-        <div class="hello-brand">
-          <img class="hello-logo" src="/logo.webp" alt="" />
-          <strong>FF.UniQbd</strong>
-          <span>Free Fire Desk</span>
-        </div>
-        <div>
-          <p>Hello, aroraadmin</p>
-        </div>
-        <div class="hello-date" id="helloDate"></div>
-      </section>
       <section class="stats-grid">
         <div class="stat-card">
           <div class="stat-top">
@@ -1044,8 +989,6 @@
         const savedTab = localStorage.getItem('arora_active_tab') || 'website';
         const lastTab = ['website', 'orders', 'vouchers', 'accounts'].includes(savedTab) ? savedTab : 'website';
         switchTab(lastTab, null);
-        const helloDate = document.getElementById('helloDate');
-        if (helloDate) helloDate.textContent = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
         loadDashboard();
       } else {
         localStorage.removeItem('arora_admin_token');
