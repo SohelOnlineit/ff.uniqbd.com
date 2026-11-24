@@ -21,14 +21,11 @@ const host = process.env.HOST || '127.0.0.1';
 const authSecret = process.env.AUTH_SECRET || '';
 const psqlBin = process.env.PSQL_BIN || 'psql';
 
-const pages = {
-  '/': 'index.html',
-  '/admin': 'admin.html',
-  '/docs': 'docs.html',
-  '/user': 'user.html',
-  '/user/login': 'user.html',
-  '/user/dashboard': 'user.html',
-};
+function publicFile(pathname) {
+  if (pathname === '/' || pathname === '/index.html') return 'index.html';
+  if (pathname === '/arorashop-ff-extension.zip') return 'arorashop-ff-extension.zip';
+  return '';
+}
 
 const types = {
   '.html': 'text/html; charset=utf-8',
@@ -46,6 +43,8 @@ function send(res, status, body, type) {
     'Content-Type': type,
     'Content-Length': Buffer.byteLength(body),
     'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
     'Cache-Control': 'no-store',
   });
   res.end(body);
@@ -245,21 +244,47 @@ function changeAdminPassword(username, body) {
   if (nextName !== username) sets.push(`username = ${sqlString(nextName)}`);
   if (changingPass) sets.push(`password_hash = ${sqlString(hashPassword(next))}`);
   pg(`UPDATE admins SET ${sets.join(', ')} WHERE username = ${sqlString(username)}`);
+  const saved = pgOne(`SELECT username, password_hash FROM admins WHERE username = ${sqlString(nextName)} LIMIT 1`);
   const message = nextName !== username && changingPass
     ? 'Admin ID and password updated.'
     : nextName !== username
       ? 'Admin ID updated.'
       : 'Password updated.';
-  return { status: 200, body: { ok: true, username: nextName, token: signToken(nextName), message } };
+  return { status: 200, body: { ok: true, username: nextName, token: signToken(saved.username, saved.password_hash), message } };
 }
 
-function signToken(username) {
+function tokenStamp(passwordHash) {
+  return crypto.createHash('sha256').update(String(passwordHash || '')).digest('base64url').slice(0, 16);
+}
+
+function signToken(username, passwordHash) {
   const body = Buffer.from(JSON.stringify({
     u: username,
+    s: tokenStamp(passwordHash),
     exp: Date.now() + 12 * 60 * 60 * 1000,
   })).toString('base64url');
   const sig = crypto.createHmac('sha256', authSecret).update(body).digest('base64url');
   return body + '.' + sig;
+}
+
+const loginFails = new Map();
+
+function loginBlocked(ip) {
+  const row = loginFails.get(ip);
+  if (!row) return false;
+  if (row.until > Date.now()) return true;
+  if (row.until) loginFails.delete(ip);
+  return false;
+}
+
+function noteLoginFail(ip) {
+  const row = loginFails.get(ip) || { n: 0, until: 0 };
+  row.n += 1;
+  if (row.n >= 8) {
+    row.until = Date.now() + 15 * 60 * 1000;
+    row.n = 0;
+  }
+  loginFails.set(ip, row);
 }
 
 function readToken(req) {
@@ -275,8 +300,10 @@ function readToken(req) {
   if (left.length !== right.length || !crypto.timingSafeEqual(left, right)) return null;
   try {
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
-    if (!payload.u || !payload.exp || payload.exp < Date.now()) return null;
-    return payload.u;
+    if (!payload.u || !payload.s || !payload.exp || payload.exp < Date.now()) return null;
+    const row = pgOne(`SELECT username, password_hash FROM admins WHERE username = ${sqlString(payload.u)} LIMIT 1`);
+    if (!row || payload.s !== tokenStamp(row.password_hash)) return null;
+    return row.username;
   } catch {
     return null;
   }
@@ -1445,8 +1472,13 @@ try {
 }
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, 'http://127.0.0.1');
-  let pathname = decodeURIComponent(url.pathname);
+  let pathname = '/';
+  try {
+    const url = new URL(req.url, 'http://127.0.0.1');
+    pathname = decodeURIComponent(url.pathname);
+  } catch {
+    return send(res, 400, 'Bad request', 'text/plain; charset=utf-8');
+  }
   if (pathname.length > 1 && pathname.endsWith('/')) pathname = pathname.slice(0, -1);
 
   if (!ipAllowed(req)) {
@@ -1458,14 +1490,23 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === '/admin-api/login' && req.method === 'POST') {
+    const ip = clientIp(req);
+    if (loginBlocked(ip)) return sendJson(res, 429, { ok: false, error: 'Too many tries. Wait 15 minutes.' });
     try {
       const body = JSON.parse(await readBody(req) || '{}');
       const username = String(body.username || '').trim();
       const password = String(body.password || '').trim();
-      if (!username || !password || !authSecret) return sendJson(res, 401, { ok: false });
+      if (!username || !password || !authSecret) {
+        noteLoginFail(ip);
+        return sendJson(res, 401, { ok: false });
+      }
       const row = pgOne('SELECT username, password_hash FROM admins WHERE username = ' + sqlString(username));
-      if (!row || !verifyPassword(password, row.password_hash)) return sendJson(res, 401, { ok: false });
-      return sendJson(res, 200, { ok: true, token: signToken(row.username) });
+      if (!row || !verifyPassword(password, row.password_hash)) {
+        noteLoginFail(ip);
+        return sendJson(res, 401, { ok: false });
+      }
+      loginFails.delete(ip);
+      return sendJson(res, 200, { ok: true, token: signToken(row.username, row.password_hash) });
     } catch (err) {
       console.error('login failed:', dbError(err));
       return sendJson(res, 401, { ok: false });
@@ -1721,15 +1762,17 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 503, { ok: false, error: 'This action is not available yet.' });
   }
 
-  const rel = pages[pathname] || pathname.replace(/^\/+/, '');
-  const full = path.normalize(path.join(root, rel));
-  if (!full.startsWith(root) || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
+  const rel = publicFile(pathname);
+  const full = rel ? path.join(root, rel) : '';
+  if (!full || !full.startsWith(root + path.sep) || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
     return send(res, 404, 'Not found', 'text/plain; charset=utf-8');
   }
 
   res.writeHead(200, {
     'Content-Type': types[path.extname(full).toLowerCase()] || 'application/octet-stream',
     'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
     'Cache-Control': ['.html', '.zip'].includes(path.extname(full).toLowerCase()) ? 'no-cache' : 'public, max-age=3600',
   });
   fs.createReadStream(full).pipe(res);
