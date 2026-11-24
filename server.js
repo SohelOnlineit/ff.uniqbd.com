@@ -599,25 +599,44 @@ function placeResellerOrder(reseller, body, ip) {
   const created = [];
   for (let index = 1; index <= quantity; index += 1) {
     const resellerOrderId = quantity === 1 ? orderId : orderId + '#' + index;
-    const existing = pgOne(`SELECT id, arora_order_utr, shop_order_number, status, package_code, package_name
-      FROM fulfillment_orders
-      WHERE reseller_id = ${Number(reseller.id)} AND reseller_order_id = ${sqlString(resellerOrderId)}
-      LIMIT 1`);
+    let existing = null;
+    try {
+      existing = pgOne(`SELECT id, arora_order_utr, shop_order_number, status, package_code, package_name
+        FROM fulfillment_orders
+        WHERE reseller_id = ${Number(reseller.id)} AND reseller_order_id = ${sqlString(resellerOrderId)}
+        LIMIT 1`);
+    } catch (err) {
+      console.error('reseller order lookup:', dbError(err));
+      existing = pgOne(`SELECT id, arora_order_utr, status, package_code, package_name
+        FROM fulfillment_orders
+        WHERE reseller_id = ${Number(reseller.id)} AND reseller_order_id = ${sqlString(resellerOrderId)}
+        LIMIT 1`);
+    }
     if (existing) {
       if (shopOrderNumber && !String(existing.shop_order_number || '').trim()) {
-        pg(`UPDATE fulfillment_orders SET shop_order_number = ${sqlString(shopOrderNumber)} WHERE id = ${Number(existing.id)}`);
-        existing.shop_order_number = shopOrderNumber;
+        try {
+          pg(`UPDATE fulfillment_orders SET shop_order_number = ${sqlString(shopOrderNumber)} WHERE id = ${Number(existing.id)}`);
+          existing.shop_order_number = shopOrderNumber;
+        } catch (err) {
+          console.error('reseller order number:', dbError(err));
+        }
       }
       created.push(existing);
       continue;
     }
     const utr = shortOrderUtr(resellerOrderId);
-    pg(`INSERT INTO fulfillment_orders
-      (arora_order_utr, shop_order_number, player_uid, package_code, package_name, quantity, method_used, status, reseller_id, reseller_order_id, order_price_bdt, ip_address)
-      VALUES (
-        ${sqlString(utr)}, ${sqlString(shopOrderNumber)}, ${sqlString(playerUid)}, ${sqlString(pack.package_code)}, ${sqlString(pack.name)},
-        1, 'none', 'QUEUED_EXT', ${Number(reseller.id)}, ${sqlString(resellerOrderId)}, ${unitPrice}, ${sqlString(ip)}
-      )`);
+    const tail = `${sqlString(playerUid)}, ${sqlString(pack.package_code)}, ${sqlString(pack.name)},
+        1, 'none', 'QUEUED_EXT', ${Number(reseller.id)}, ${sqlString(resellerOrderId)}, ${unitPrice}, ${sqlString(ip)}`;
+    try {
+      pg(`INSERT INTO fulfillment_orders
+        (arora_order_utr, shop_order_number, player_uid, package_code, package_name, quantity, method_used, status, reseller_id, reseller_order_id, order_price_bdt, ip_address)
+        VALUES (${sqlString(utr)}, ${sqlString(shopOrderNumber)}, ${tail})`);
+    } catch (err) {
+      console.error('reseller order insert:', dbError(err));
+      pg(`INSERT INTO fulfillment_orders
+        (arora_order_utr, player_uid, package_code, package_name, quantity, method_used, status, reseller_id, reseller_order_id, order_price_bdt, ip_address)
+        VALUES (${sqlString(utr)}, ${tail})`);
+    }
     created.push({ arora_order_utr: utr, shop_order_number: shopOrderNumber, status: 'QUEUED_EXT', package_code: pack.package_code, package_name: pack.name });
     notifyOrderStatus({ arora_order_utr: utr, shop_order_number: shopOrderNumber, package_name: pack.name, player_uid: playerUid }, 'QUEUED_EXT', '');
   }
