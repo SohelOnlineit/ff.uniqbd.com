@@ -1,5 +1,6 @@
 const DEFAULT_API_BASE = 'https://ff.uniqbd.com';
 const GARENA_SHOP_URL = 'https://shop.garena.my/?channel=202953';
+let pollChain = Promise.resolve();
 
 function shownOrder(task) {
   const shop = String((task && task.shop_order_number) || '').trim();
@@ -10,7 +11,8 @@ function shownOrder(task) {
 }
 
 function ensurePollAlarm() {
-  chrome.alarms.create('aroraPollOrders', { periodInMinutes: 0.1 });
+  chrome.alarms.clear('aroraPollOrders');
+  chrome.alarms.create('uniqbdPollOrders', { periodInMinutes: 0.1 });
 }
 
 ensurePollAlarm();
@@ -22,7 +24,7 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'aroraPollOrders') {
+  if (alarm.name === 'uniqbdPollOrders') {
     pollNextOrder(false);
   }
 });
@@ -90,16 +92,20 @@ async function clearShopCookies() {
   } catch (_) {}
 }
 
+function isDeliveryTab(url) {
+  try {
+    const host = new URL(url).hostname;
+    return host === 'shop.garena.my' || host === 'unipin.com' || host.endsWith('.unipin.com');
+  } catch (_) {
+    return false;
+  }
+}
+
 async function closeFulfillmentTab(tabId) {
   if (!tabId) return;
   try {
     const tab = await chrome.tabs.get(tabId).catch(() => null);
-    if (!tab) return;
-    const url = tab.url || '';
-    // Safety: only auto-close Garena Shop or UniPin tabs (never close the ff.uniqbd.com dashboard)
-    if (!url.includes('shop.garena.my') && !url.includes('unipin.com')) {
-      return;
-    }
+    if (!tab || !isDeliveryTab(tab.url || '')) return;
     const tabsInWindow = await chrome.tabs.query({ windowId: tab.windowId });
     if (tabsInWindow.length <= 1) {
       // Keep browser alive so background polling continues for future orders
@@ -127,7 +133,13 @@ async function pingDesk(st) {
   }
 }
 
-async function pollNextOrder(force = false) {
+function pollNextOrder(force = false) {
+  const run = pollChain.then(() => pollNextOrderNow(force));
+  pollChain = run.then(() => undefined, () => undefined);
+  return run;
+}
+
+async function pollNextOrderNow(force = false) {
   const st = await getSettings();
   if (!st.extKey) {
     await chrome.storage.local.set({ lastLog: 'Extension key is not saved' });
@@ -205,10 +217,8 @@ async function pollNextOrder(force = false) {
 
     const task = {
       ...data.task,
-      step: 'GARENA_UID',
       pausedForCaptcha: false,
       startedAt: Date.now(),
-      uidTries: 0,
     };
 
     await chrome.storage.local.set({
@@ -243,6 +253,10 @@ async function pollNextOrder(force = false) {
 }
 
 async function submitOrderResult({ orderUtr, status, receiptNote, errorMessage, releaseVoucher }, senderTabId = null) {
+  const allowed = ['COMPLETED', 'LOGIN_FAILED', 'CANCELLED'];
+  if (!allowed.includes(status) || !String(orderUtr || '').trim()) {
+    return { ok: false, error: 'Invalid order result' };
+  }
   const st = await getSettings();
   if (!st.extKey) return { ok: false, error: 'Missing Extension Key' };
 
@@ -303,13 +317,25 @@ async function submitOrderResult({ orderUtr, status, receiptNote, errorMessage, 
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || typeof msg !== 'object') return;
+  if (sender.id !== chrome.runtime.id) return;
   if (msg.type === 'POLL_NOW' || msg.type === 'CHECK_CONNECTION') {
     pollNextOrder(msg.type === 'POLL_NOW').then(sendResponse);
     return true;
   }
   if (msg.type === 'REPORT_ORDER_RESULT') {
     const senderTabId = sender && sender.tab ? sender.tab.id : null;
-    submitOrderResult(msg.payload, senderTabId).then(sendResponse);
+    const pageUrl = String((sender && sender.url) || '');
+    let allowedPage = false;
+    try {
+      const host = new URL(pageUrl).hostname;
+      allowedPage = host === 'shop.garena.my' || host === 'unipin.com' || host.endsWith('.unipin.com');
+    } catch (_) {}
+    if (!allowedPage) {
+      sendResponse({ ok: false, error: 'This page cannot report an order' });
+      return;
+    }
+    submitOrderResult(msg.payload || {}, senderTabId).then(sendResponse);
     return true;
   }
   if (msg.type === 'CLEAR_ACTIVE_TASK') {

@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ? `Active: ${shownOrder(res.activeTask)} (UID: ${res.activeTask.player_uid})`
         : (res.lastLog || 'Not connected');
       statusBox.textContent = text;
-      statusBox.style.color = /not saved|rejected|cannot reach|failed|error/i.test(text) ? '#fb7185' : '#34d399';
+      statusBox.style.color = /not saved|rejected|cannot reach|failed|error|cancel/i.test(text) ? '#fb7185' : '#34d399';
     });
   }
 

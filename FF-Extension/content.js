@@ -7,7 +7,6 @@
 
   let stepBusy = false;
   let lastAccordionClickAt = 0;
-  let accordionAttemptIdx = 0;
   let denomMissingCount = 0;
   let confirmClickedAt = 0;
   let retriedSerialNoDash = false;
@@ -17,6 +16,20 @@
   const reportedUtrs = new Set();
   let loginAttemptKey = '';
   let loginClickedAt = 0;
+  let confirmArmed = false;
+
+  function esc(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function escapeRegExp(value) {
+    return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
 
   window.addEventListener('load', () => {
     if (!pageLoadedAt) pageLoadedAt = Date.now();
@@ -38,7 +51,6 @@
       '#loading',
       '.modal-loading',
       '.spinner-overlay',
-      '[aria-busy="true"]',
     ];
     for (const sel of loaderSelectors) {
       const els = document.querySelectorAll(sel);
@@ -181,27 +193,6 @@
     return pool[0];
   }
 
-  // Find the section box for "Physical Vouchers" or "Wallet" without bleeding into the other section or the Back button
-  function findAccordionBox(sectionTitleRegex, otherTitleRegex) {
-    const labelEl = findDeepestByText(sectionTitleRegex);
-    if (!labelEl) return null;
-    let curr = labelEl.parentElement;
-    let bestBox = labelEl.parentElement;
-    while (curr && curr !== document.body) {
-      const txt = (curr.innerText || '').trim();
-      if (
-        (otherTitleRegex && otherTitleRegex.test(txt)) ||
-        /Select Payment Channel/i.test(txt) ||
-        curr.querySelector('a[href*="select_denom"]')
-      ) {
-        break;
-      }
-      bestBox = curr;
-      curr = curr.parentElement;
-    }
-    return { labelEl, box: bestBox };
-  }
-
   function isVisibleCaptchaOnPage() {
     const frames = Array.from(document.querySelectorAll('iframe'));
     for (const f of frames) {
@@ -247,12 +238,12 @@
     bar.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
         <strong style="color:#15b48b;font-size:13px;">UniQbd</strong>
-        <span style="background:rgba(21,180,139,0.16);color:#34d399;padding:2px 7px;border-radius:99px;font-size:11px;font-weight:600;">${shownOrder(task)}</span>
+        <span style="background:rgba(21,180,139,0.16);color:#34d399;padding:2px 7px;border-radius:99px;font-size:11px;font-weight:600;">${esc(shownOrder(task))}</span>
       </div>
-      <div style="color:#cbd5e1;margin-bottom:4px;">UID: <b>${task.player_uid}</b> &bull; <b>${task.denom_label}</b></div>
-      <div style="color:#94a3b8;font-size:11px;margin-bottom:8px;">Mode: ${modeBadge}</div>
+      <div style="color:#cbd5e1;margin-bottom:4px;">UID: <b>${esc(task.player_uid)}</b> &bull; <b>${esc(task.denom_label)}</b></div>
+      <div style="color:#94a3b8;font-size:11px;margin-bottom:8px;">Mode: ${esc(modeBadge)}</div>
       <div style="padding:7px 9px;border-radius:8px;background:${isPaused ? 'rgba(245,158,11,0.16)' : '#090d12'};color:${isPaused ? '#fbbf24' : '#a7f3d0'};font-weight:600;margin-bottom:10px;">
-        ${statusText}
+        ${esc(statusText)}
       </div>
       <div style="display:flex;gap:6px;">
         <button id="aroraExtResumeBtn" style="flex:1;background:#15b48b;color:#fff;border:none;border-radius:7px;padding:7px 8px;font-size:11px;font-weight:600;cursor:pointer;">Resume Step</button>
@@ -301,43 +292,6 @@
     };
   }
 
-  // Find UniPin v5 category card using #VOUCHER_charges or #WALLET_charges (exact DOM anchor)
-  function findUniPinCategoryCard(type) {
-    const chargesId = type === 'voucher' ? 'VOUCHER_charges' : 'WALLET_charges';
-    const otherChargesId = type === 'voucher' ? 'WALLET_charges' : 'VOUCHER_charges';
-    const chargesEl = document.getElementById(chargesId);
-
-    if (chargesEl) {
-      const cardBb = chargesEl.closest('.payment-card-bb') || chargesEl.parentElement;
-      let curr = cardBb ? cardBb.parentElement : chargesEl.parentElement;
-      let bestBox = cardBb || chargesEl.parentElement;
-      while (curr && curr !== document.body) {
-        if (
-          curr.querySelector('#' + otherChargesId) ||
-          curr.querySelector('a[href*="select_denom"]') ||
-          /Select Payment Channel/i.test((curr.innerText || '').trim())
-        ) {
-          break;
-        }
-        bestBox = curr;
-        curr = curr.parentElement;
-      }
-      return { cardBb, labelEl: cardBb, box: bestBox };
-    }
-
-    // Fallback to text search if IDs ever change
-    const secRegex = type === 'voucher' ? /^\s*Physical Vouchers\s*$/i : /^\s*Wallet\s*$/i;
-    const otherRegex = type === 'voucher' ? /Wallet/i : /Physical Vouchers/i;
-    const fb = findAccordionBox(secRegex, otherRegex);
-    return fb ? { cardBb: fb.labelEl, labelEl: fb.labelEl, box: fb.box } : null;
-  }
-
-  // NOTE: UniPin hardcodes aria-expanded="true" even when collapsed! Only trust .collapse.show
-  function isAccordionExpanded(box) {
-    if (!box) return false;
-    return Boolean(box.querySelector('.panel-collapse.show, .collapse.show, .collapsing'));
-  }
-
   function clickSingleElement(el) {
     if (!el) return;
     el.scrollIntoView({ block: 'center', behavior: 'instant' });
@@ -358,101 +312,13 @@
     }
   }
 
-  function expandUniPinAccordion(box, cardBb) {
-    if (!box) return;
-    if (isAccordionExpanded(box)) return;
-    if (Date.now() - lastAccordionClickAt < 1800) return;
-
-    const candidates = [];
-    const addCandidate = (el) => {
-      if (el && isVisible(el) && !candidates.includes(el)) {
-        candidates.push(el);
-      }
-    };
-
-    // 1. Direct ancestor toggle of .payment-card-bb (e.g. <button>, <a data-toggle>, <div onclick>)
-    if (cardBb) {
-      addCandidate(cardBb.closest('button, a, [data-toggle], [data-bs-toggle], [aria-expanded], [onclick]'));
-      addCandidate(cardBb.parentElement);
-      addCandidate(cardBb);
-      // Sibling right below .payment-card-bb (the strip with UniPin/UP Gift Card logos & v chevron)
-      if (cardBb.nextElementSibling) {
-        addCandidate(cardBb.nextElementSibling);
-      }
-    }
-
-    // 2. Visible Bootstrap / ARIA collapse triggers inside box
-    Array.from(
-      box.querySelectorAll('[data-toggle="collapse"], [data-bs-toggle="collapse"], [aria-expanded="false"], [data-target], [data-bs-target]')
-    ).forEach(addCandidate);
-
-    // 3. Rightmost visible chevron icon inside box
-    const visibleIcons = Array.from(box.querySelectorAll('i, svg, img[src*="arrow" i], img[src*="chevron" i]')).filter(isVisible);
-    if (visibleIcons.length > 0) {
-      visibleIcons.sort((a, b) => b.getBoundingClientRect().right - a.getBoundingClientRect().right);
-      const chevron = visibleIcons[0];
-      addCandidate(chevron.closest('button, a, [role="button"], div') || chevron);
-      addCandidate(chevron);
-    }
-
-    // 4. Outer box itself
-    addCandidate(box);
-
-    if (candidates.length === 0) return;
-    const chosen = candidates[accordionAttemptIdx % candidates.length];
-    accordionAttemptIdx += 1;
-    lastAccordionClickAt = Date.now();
-    console.log('[AroraExt] Expanding UniPin accordion attempt #' + accordionAttemptIdx, chosen);
-    clickSingleElement(chosen);
-  }
-
-  function findExpandedChannelItems(rootBox, headerRegex) {
-    if (!rootBox || rootBox === document || rootBox === document.body) return [];
-    const collapseBody = rootBox.querySelector('.collapse.show, .accordion-collapse.show, .card-body');
-    const scope = collapseBody && isVisible(collapseBody) ? collapseBody : rootBox;
-
-    // Look for clickable channel cards/links/buttons inside the expanded section
-    const candidates = Array.from(
-      scope.querySelectorAll(
-        'a[href], button, [onclick], [role="button"], .payment-channel, .channel-item, .channel-box, .list-group-item, div[class*="channel" i], div[class*="denom" i], div[class*="payment" i]'
-      )
-    ).filter((el) => {
-      if (!isVisible(el)) return false;
-      if (el.id === 'arora-ext-helper-bar' || el.closest('#arora-ext-helper-bar')) return false;
-      // NEVER click a Back button or select_denom link!
-      const href = (el.getAttribute('href') || '').toLowerCase();
-      if (href.includes('select_denom') || href.includes('back') || href === '#' || href.startsWith('javascript:')) {
-        if (href.includes('select_denom') || href.includes('back')) return false;
-      }
-      // Skip the accordion toggle header itself
-      if (el.hasAttribute('data-toggle') || el.hasAttribute('data-bs-toggle') || el.hasAttribute('aria-expanded')) {
-        return false;
-      }
-      const txt = (el.innerText || '').trim();
-      if (headerRegex && headerRegex.test(txt)) return false;
-      if (/Select Payment Channel/i.test(txt)) return false;
-      // Must have either a payment channel URL, a price (BDT/UP/RM/MYR), or a recognizable channel name/image inside an expanded body
-      const hasChannelImg = Boolean(el.querySelector('img'));
-      return (
-        href.includes('/unibox/c/') ||
-        href.includes('/unibox/p/') ||
-        href.includes('channel') ||
-        /BDT|UP\s*\d|RM\s*\d|MYR|UniPin\s*Voucher|UP\s*Gift\s*Card|Up\s*Points|UPPoints|UniPin\s*Credits/i.test(txt) ||
-        (Boolean(collapseBody) && hasChannelImg)
-      );
-    });
-
-    // Deduplicate to deepest clickable elements so we don't return both wrapper and inner link
-    const leaves = candidates.filter((el) => !candidates.some((other) => other !== el && el.contains(other)));
-    return leaves.length > 0 ? leaves : candidates;
-  }
-
   async function runAutomationStep() {
     if (stepBusy) return;
     stepBusy = true;
 
     try {
-      chrome.storage.local.get(['activeTask'], async (res) => {
+      chrome.storage.local.get(['activeTask'], (res) => {
+        try {
         const task = res.activeTask;
         if (!task) {
           const oldBar = document.getElementById('arora-ext-helper-bar');
@@ -493,6 +359,19 @@
 
         // ==================== A. GARENA SHOP (shop.garena.my) ====================
         if (host.includes('shop.garena.my')) {
+          const playerUid = String(task.player_uid || '').trim();
+          if (!/^\d{5,15}$/.test(playerUid)) {
+            renderFloatingBar(task, 'Login Failed', true);
+            reportOnce(task, {
+              orderUtr: task.order_utr,
+              status: 'LOGIN_FAILED',
+              errorMessage: 'Login Failed. This Free Fire ID is not valid.',
+              releaseVoucher: true,
+            });
+            stepBusy = false;
+            return;
+          }
+
           const proceedBtn = findDeepestByText(/Proceed to Payment/i);
           if (proceedBtn) {
             if (isInActionCooldown('garena_proceed', 7000)) {
@@ -519,7 +398,7 @@
             reportOnce(task, {
               orderUtr: task.order_utr,
               status: 'LOGIN_FAILED',
-              errorMessage: `Login Failed. Could not log in to Free Fire ID ${task.player_uid}.`,
+              errorMessage: `Login Failed. Could not log in to Free Fire ID ${playerUid}.`,
               releaseVoucher: true,
             });
             stepBusy = false;
@@ -533,12 +412,12 @@
               reportOnce(task, {
                 orderUtr: task.order_utr,
                 status: 'LOGIN_FAILED',
-                errorMessage: `Login Failed. Could not log in to Free Fire ID ${task.player_uid}.`,
-                releaseVoucher: true,
-              });
-              stepBusy = false;
-              return;
-            }
+              errorMessage: `Login Failed. Could not log in to Free Fire ID ${playerUid}.`,
+              releaseVoucher: true,
+            });
+            stepBusy = false;
+            return;
+          }
             if (loginClickedAt) {
               renderFloatingBar(task, 'Checking Free Fire ID...', false);
               stepBusy = false;
@@ -550,9 +429,9 @@
               return;
             }
             markAction('garena_uid_login');
-            renderFloatingBar(task, `Entering UID ${task.player_uid} & clicking Login...`, false);
-            if (uidInput.value !== String(task.player_uid)) {
-              setNativeValue(uidInput, task.player_uid);
+            renderFloatingBar(task, `Entering UID ${playerUid} & clicking Login...`, false);
+            if (uidInput.value !== playerUid) {
+              setNativeValue(uidInput, playerUid);
             }
             setTimeout(() => {
               if (`${task.order_utr}:${task.startedAt || 0}` !== loginAttemptKey) return;
@@ -630,6 +509,7 @@
               ) {
                 retriedSerialNoDash = true;
                 confirmClickedAt = 0;
+                confirmArmed = false;
                 renderFloatingBar(task, 'Adjusting serial format (removing hyphens) & retrying...', false);
                 stepBusy = false;
                 return;
@@ -653,7 +533,7 @@
               stepBusy = false;
               return;
             }
-            const escaped = task.denom_label.replace(/\s+/g, '\\s+');
+            const escaped = escapeRegExp(task.denom_label).replace(/\s+/g, '\\s+');
             const denomEl = findDeepestByText(new RegExp(`^\\s*${escaped}\\s*$`, 'i'));
             if (denomEl) {
               denomMissingCount = 0;
@@ -788,6 +668,11 @@
           }
 
           if (task.mode === 'unipin_voucher' && task.voucher && visibleInputs.length > 0) {
+            if (confirmArmed && !confirmClickedAt) {
+              renderFloatingBar(task, 'Clicking Confirm...', false);
+              stepBusy = false;
+              return;
+            }
             if (confirmClickedAt > 0) {
               const waitedMs = Date.now() - confirmClickedAt;
               const waitedSec = Math.round(waitedMs / 1000);
@@ -838,10 +723,15 @@
                 setNativeValue(visibleInputs[i], chunks[i - 1]);
               }
             }
-            confirmClickedAt = Date.now();
+            confirmArmed = true;
             setTimeout(() => {
               const confirmBtn = findConfirmSubmitButton();
-              if (confirmBtn) clickSingleElement(confirmBtn);
+              if (confirmBtn) {
+                clickSingleElement(confirmBtn);
+                confirmClickedAt = Date.now();
+              } else {
+                confirmArmed = false;
+              }
             }, FORM_SUBMIT_DELAY_MS);
             stepBusy = false;
             return;
@@ -884,6 +774,11 @@
             if (pinDigits.length === 6 && hasPinScreen) {
               // Patiently wait up to 60s for UniPin to process payment & redirect to Success page!
               // Genuine errors (Wrong PIN / Insufficient balance) are caught immediately by step #2 above.
+              if (confirmArmed && !confirmClickedAt) {
+                renderFloatingBar(task, 'Clicking Confirm...', false);
+                stepBusy = false;
+                return;
+              }
               if (confirmClickedAt > 0) {
                 const waitedMs = Date.now() - confirmClickedAt;
                 const waitedSec = Math.round(waitedMs / 1000);
@@ -920,10 +815,15 @@
                 setNativeValue(visibleInputs[0], pinDigits);
               }
 
-              confirmClickedAt = Date.now();
+              confirmArmed = true;
               setTimeout(() => {
                 const confirmBtn = findConfirmSubmitButton();
-                if (confirmBtn) clickSingleElement(confirmBtn);
+                if (confirmBtn) {
+                  clickSingleElement(confirmBtn);
+                  confirmClickedAt = Date.now();
+                } else {
+                  confirmArmed = false;
+                }
               }, FORM_SUBMIT_DELAY_MS);
               stepBusy = false;
               return;
@@ -933,7 +833,10 @@
           renderFloatingBar(task, 'Waiting for UniPin page step...', false);
         }
 
-        stepBusy = false;
+        } catch (_) {
+        } finally {
+          stepBusy = false;
+        }
       });
     } catch (_) {
       stepBusy = false;
