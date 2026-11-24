@@ -395,6 +395,26 @@
     .connect-banner.wait .connect-dot { background: #fbbf24; }
     .connect-banner.wait strong { color: #fbbf24; }
 
+    .info-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .info-box {
+      background: #02141b;
+      border: 1px solid #12343c;
+      border-radius: 16px;
+      padding: 14px;
+      min-width: 0;
+    }
+    .info-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .info-value { font-size: 14px; font-weight: 700; word-break: break-word; }
+    .info-value code { font-size: 12px; color: #5eead4; }
+    .info-wide { margin-top: 12px; }
     .sec-list { list-style: none; display: flex; flex-direction: column; gap: 11px; }
     .sec-row {
       display: flex;
@@ -524,6 +544,7 @@
     @media (max-width: 1200px) {
       .pkg-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .set-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
     /* Responsive Mobile Polish */
@@ -552,6 +573,7 @@
       .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .pkg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .set-grid { grid-template-columns: 1fr; }
+      .info-grid { grid-template-columns: 1fr; }
       .grid-2 { grid-template-columns: 1fr; }
       .grid-2.pair { grid-template-columns: 1fr 1fr; }
     }
@@ -741,9 +763,9 @@
             </div>
           </div>
           <p id="webVerdict" class="hidden" style="margin:0 0 12px;color:var(--muted);">Loading dashboard…</p>
-          <ul id="webInfo" class="sec-list"></ul>
-          <div class="field" style="margin-top:14px;">
-            <label>Extension key</label>
+          <div id="webInfo" class="info-grid"></div>
+          <div class="info-box info-wide">
+            <div class="info-label">Extension key</div>
             <div class="key-row">
               <input type="text" id="extKeyBox" readonly style="font-family:monospace;font-size:12px;" />
               <button type="button" class="btn btn-secondary btn-sm" onclick="copyExtKey()">Copy Key</button>
@@ -751,28 +773,6 @@
             </div>
           </div>
           <pre id="uniqbdProbe" class="hidden" style="margin-top:12px;background:#06090d;border:1px solid var(--border);padding:12px;border-radius:10px;font-size:12px;overflow:auto;"></pre>
-        </div>
-        <div class="card" style="margin-bottom:14px;">
-          <div class="card-head">
-            <div class="card-title">Packages</div>
-            <span class="card-sub">UniQbd name, price, and stock</span>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>UniQbd</th>
-                  <th>Package</th>
-                  <th>Price</th>
-                  <th>UP cost</th>
-                  <th>Tokens</th>
-                  <th>Orders</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody id="webPackages"></tbody>
-            </table>
-          </div>
         </div>
       </section>
 
@@ -1372,11 +1372,6 @@
       }
     }
 
-    function moneyText(value) {
-      const amount = Number(value || 0);
-      return '৳' + amount.toFixed(2);
-    }
-
     let uniqbdChecked = false;
 
     function setConnect(state, title, detail) {
@@ -1407,37 +1402,26 @@
         uniqbdChecked = true;
         checkUniqbd();
       }
-      document.getElementById('webInfo').innerHTML = `
-        <li class="sec-row"><span>${ICONS.globe} This website</span><code>https://ff.uniqbd.com</code></li>
-        <li class="sec-row"><span>${ICONS.globe} Shop</span><code>https://uniqbd.com</code></li>
-        <li class="sec-row"><span>${ICONS.send} Order API</span><code>${esc(link.api_url || '')}</code></li>
-        <li class="sec-row"><span>${ICONS.send} Webhook</span><code>${esc(link.webhook_url || 'Not set')}</code></li>
-        <li class="sec-row"><span>${ICONS.lock} API key</span>${pill(link.api_key_saved, 'Saved', 'Missing')}</li>
-        <li class="sec-row"><span>${ICONS.lock} API secret</span>${pill(link.api_secret_saved, 'Saved', 'Missing')}</li>
-        <li class="sec-row"><span>${ICONS.check} Webhook target</span>${pill(link.webhook_ready, 'uniqbd.com', 'Wrong')}</li>
-        <li class="sec-row"><span>${ICONS.play} Extension</span>${pill(online, 'Online', 'Offline')}</li>
-        <li class="sec-row"><span>${ICONS.send} Telegram</span>${pill(d.security_info && d.security_info.telegram_connected, 'Active', 'Off')}</li>
-        <li class="sec-row"><span>${ICONS.ticket} Token stock</span><b>${d.stats.total_available_tokens}</b></li>
-        <li class="sec-row"><span>${ICONS.card} Account balance</span><b>${d.stats.total_account_balance} UP</b></li>
-        <li class="sec-row"><span>${ICONS.check} Orders</span><b>${d.stats.completed_orders} completed / ${d.stats.total_orders} total</b></li>
-        <li class="sec-row"><span>${ICONS.shield} Packages ready</span><b>${readyCount} / ${activeCount}</b></li>
-      `;
-      const byCode = {};
-      (link.packages || []).forEach((row) => { byCode[row.package_code] = row; });
-      document.getElementById('webPackages').innerHTML = (d.packages || []).map((row) => {
-        const match = byCode[row.package_code] || {};
-        return `
-          <tr>
-            <td><b>${esc(match.uniqbd_name || row.name)}</b></td>
-            <td><code>${esc(row.package_code)}</code><br><span style="color:var(--muted);">${esc(row.name)} · ${esc(row.diamonds)} diamonds</span></td>
-            <td>${moneyText(row.price_bdt)}</td>
-            <td>${esc(row.unipin_uc_cost)} UP</td>
-            <td>${esc(row.available_tokens)}</td>
-            <td>${esc(row.order_count || 0)}</td>
-            <td>${pill(match.ready, 'Ready', row.is_active ? 'Need stock' : 'Inactive')}</td>
-          </tr>
-        `;
-      }).join('');
+      const infoBox = (icon, label, value) => `
+        <div class="info-box">
+          <div class="info-label">${icon} ${label}</div>
+          <div class="info-value">${value}</div>
+        </div>`;
+      document.getElementById('webInfo').innerHTML = [
+        infoBox(ICONS.globe, 'This website', '<code>https://ff.uniqbd.com</code>'),
+        infoBox(ICONS.globe, 'Shop', '<code>https://uniqbd.com</code>'),
+        infoBox(ICONS.send, 'Order API', `<code>${esc(link.api_url || '')}</code>`),
+        infoBox(ICONS.send, 'Webhook', `<code>${esc(link.webhook_url || 'Not set')}</code>`),
+        infoBox(ICONS.lock, 'API key', pill(link.api_key_saved, 'Saved', 'Missing')),
+        infoBox(ICONS.lock, 'API secret', pill(link.api_secret_saved, 'Saved', 'Missing')),
+        infoBox(ICONS.check, 'Webhook target', pill(link.webhook_ready, 'uniqbd.com', 'Wrong')),
+        infoBox(ICONS.play, 'Extension', pill(online, 'Online', 'Offline')),
+        infoBox(ICONS.send, 'Telegram', pill(d.security_info && d.security_info.telegram_connected, 'Active', 'Off')),
+        infoBox(ICONS.ticket, 'Token stock', `<b>${d.stats.total_available_tokens}</b>`),
+        infoBox(ICONS.card, 'Account balance', `<b>${d.stats.total_account_balance} UP</b>`),
+        infoBox(ICONS.check, 'Orders', `<b>${d.stats.completed_orders} completed / ${d.stats.total_orders} total</b>`),
+        infoBox(ICONS.shield, 'Packages ready', `<b>${readyCount} / ${activeCount}</b>`),
+      ].join('');
     }
 
     function whenText(value) {
