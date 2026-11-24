@@ -640,7 +640,9 @@ function dashboard() {
            (SELECT COUNT(*) FROM unipin_vouchers v
              WHERE v.package_code = p.package_code AND lower(v.status) = 'available') AS available_tokens,
            (SELECT COUNT(*) FROM unipin_vouchers v
-             WHERE v.package_code = p.package_code AND lower(v.status) <> 'available') AS used_tokens
+             WHERE v.package_code = p.package_code AND lower(v.status) <> 'available') AS used_tokens,
+           (SELECT COUNT(*) FROM fulfillment_orders o WHERE o.package_code = p.package_code) AS order_count,
+           (SELECT price_bdt FROM reseller_prices r WHERE r.package_code = p.package_code ORDER BY r.reseller_id LIMIT 1) AS price_bdt
     FROM ff_packages p
     ORDER BY p.id
   `);
