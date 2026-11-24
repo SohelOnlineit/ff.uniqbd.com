@@ -1010,6 +1010,15 @@
               <span><strong>Telegram</strong><em>Order alerts for each status.</em></span>
             </button>
           </div>
+          <div id="setInfo" class="info-grid"></div>
+          <div class="info-box info-wide">
+            <div class="info-label">Extension key</div>
+            <div class="key-row">
+              <input type="text" id="setExtKey" readonly style="font-family:monospace;font-size:12px;" />
+              <button type="button" class="btn btn-secondary btn-sm" onclick="copyExtKey('setExtKey')">Copy Key</button>
+              <a href="/arorashop-ff-extension.zip" download class="btn btn-primary btn-sm" style="text-decoration:none;">Download</a>
+            </div>
+          </div>
         </div>
         <div id="setSecurity" class="set-panel hidden">
           <button type="button" class="btn btn-secondary btn-sm set-back" onclick="openSetting('')">← General</button>
@@ -1361,11 +1370,12 @@
         }).join('');
 
       const s = d.security_info || {};
-      const keyBox = document.getElementById('extKeyBox');
-      if (keyBox) {
+      ['extKeyBox', 'setExtKey'].forEach((id) => {
+        const keyBox = document.getElementById(id);
+        if (!keyBox) return;
         keyBox.value = maskSecret(s.extension_key);
         keyBox.dataset.full = s.extension_key || '';
-      }
+      });
       renderWebsite(d);
       } finally {
         dashBusy = false;
@@ -1422,6 +1432,8 @@
         infoBox(ICONS.check, 'Orders', `<b>${d.stats.completed_orders} completed / ${d.stats.total_orders} total</b>`),
         infoBox(ICONS.shield, 'Packages ready', `<b>${readyCount} / ${activeCount}</b>`),
       ].join('');
+      const setInfo = document.getElementById('setInfo');
+      if (setInfo) setInfo.innerHTML = document.getElementById('webInfo').innerHTML;
     }
 
     function whenText(value) {
@@ -1657,8 +1669,9 @@
       loadDashboard();
     }
 
-    function copyExtKey() {
-      const val = document.getElementById('extKeyBox').dataset.full || '';
+    function copyExtKey(id) {
+      const box = document.getElementById(typeof id === 'string' ? id : 'extKeyBox') || document.getElementById('extKeyBox');
+      const val = (box && box.dataset.full) || '';
       if (!val) return;
       navigator.clipboard.writeText(val);
       showToast('Extension Key copied!');
