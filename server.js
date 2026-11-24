@@ -654,7 +654,7 @@ function dashboard() {
   `);
   const orders = pgJson(`
     SELECT id, arora_order_utr, player_uid, package_code, package_name, quantity,
-           method_used, status, status_reason, receipt_note
+           method_used, status, status_reason, receipt_note, webhook_status, created_at
     FROM fulfillment_orders
     ORDER BY id DESC
   `);

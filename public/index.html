@@ -556,18 +556,6 @@
           <svg class="ico ico-sm" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
           Accounts
         </button>
-        <button class="tab-btn" onclick="switchTab('packages', this)">
-          <svg class="ico ico-sm" viewBox="0 0 24 24"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
-          Packages
-        </button>
-        <button class="tab-btn" onclick="switchTab('security', this)">
-          <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          Security
-        </button>
-        <button class="tab-btn" onclick="switchTab('uniqbd', this)">
-          <svg class="ico ico-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          UniQbd
-        </button>
       </nav>
     </aside>
     <div>
@@ -575,7 +563,7 @@
       <div class="topbar-inner">
         <div class="topbar-brand">
           <div>
-            <div class="topbar-title">Overview</div>
+            <div class="topbar-title">Dashboard</div>
             <div class="topbar-status"><span class="dot-live"></span> Secure Engine</div>
           </div>
         </div>
@@ -586,10 +574,6 @@
           </span>
           <a href="/docs" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none;" title="Public API & Webhook Documentation">Docs</a>
           <a href="/admin" class="btn btn-primary btn-sm" style="text-decoration:none;" title="Manage API Resellers & Users">Admin</a>
-          <button class="btn btn-secondary btn-sm" onclick="testTelegram()" title="Test Telegram">
-            <svg class="ico ico-sm" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            <span class="btn-label-hide">Telegram</span>
-          </button>
           <button class="btn btn-secondary btn-sm" onclick="loadDashboard()" title="Refresh">
             <svg class="ico ico-sm" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
             <span class="btn-label-hide">Refresh</span>
@@ -656,9 +640,22 @@
               <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
               Dashboard
             </div>
-            <span class="card-sub" id="webVerdict">Loading dashboard…</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span class="card-sub" id="webUpdated">Last update —</span>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="checkUniqbd()">Check UniQbd</button>
+            </div>
           </div>
+          <p id="webVerdict" style="margin:0 0 12px;color:var(--muted);">Loading dashboard…</p>
           <ul id="webInfo" class="sec-list"></ul>
+          <div class="field" style="margin-top:14px;">
+            <label>Extension key</label>
+            <div class="key-row">
+              <input type="text" id="extKeyBox" readonly style="font-family:monospace;font-size:12px;" />
+              <button type="button" class="btn btn-secondary btn-sm" onclick="copyExtKey()">Copy Key</button>
+              <a href="/arorashop-ff-extension.zip" download class="btn btn-primary btn-sm" style="text-decoration:none;">Download</a>
+            </div>
+          </div>
+          <pre id="uniqbdProbe" style="margin-top:12px;background:#06090d;border:1px solid var(--border);padding:12px;border-radius:10px;font-size:12px;overflow:auto;display:none;"></pre>
         </div>
         <div class="card" style="margin-bottom:14px;">
           <div class="card-head">
@@ -703,7 +700,13 @@
             <div class="table-wrap">
               <table>
                 <thead>
-                  <tr><th>Order</th><th>Package</th><th>Status</th></tr>
+                  <tr>
+                    <th>Player</th>
+                    <th>Package</th>
+                    <th>Status</th>
+                    <th>Webhook</th>
+                    <th>Updated</th>
+                  </tr>
                 </thead>
                 <tbody id="webOrders"></tbody>
               </table>
@@ -891,142 +894,6 @@
           </div>
         </div>
       </section>
-
-      <!-- TAB 4: PACKAGES -->
-      <section id="tab-packages" class="tab-pane hidden">
-        <div class="card">
-          <div class="card-head">
-            <div class="card-title">
-              <svg class="ico" viewBox="0 0 24 24"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
-              Package Identifiers
-            </div>
-            <span class="card-sub">Synced with ff.uniqbd.com</span>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Service ID</th>
-                  <th>Name</th>
-                  <th>UP Cost</th>
-                  <th>Low Limit</th>
-                  <th>Stock</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody id="packagesBody"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- TAB 5: SECURITY & TEST -->
-      <section id="tab-security" class="tab-pane hidden">
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-head">
-              <div class="card-title">
-                <svg class="ico" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                Order Simulator
-              </div>
-              <span class="card-sub">Test live flow</span>
-            </div>
-            <form id="testOrderForm">
-              <div class="field">
-                <label for="testPkgCode">Package</label>
-                <select id="testPkgCode"></select>
-              </div>
-              <div class="field">
-                <label for="testUid">Test Player UID</label>
-                <input type="text" id="testUid" value="1987654321" required />
-              </div>
-              <button type="submit" class="btn btn-primary w-full">
-                <svg class="ico ico-sm" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                Run Test Order
-              </button>
-            </form>
-            <pre id="testOrderResult" style="margin-top:12px;background:#06090d;border:1px solid var(--border);padding:12px;border-radius:10px;font-size:12px;overflow:auto;display:none;"></pre>
-          </div>
-
-          <div class="card">
-            <div class="card-head">
-              <div class="card-title">
-                <svg class="ico" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                Chrome Extension & Security
-              </div>
-              <a href="/arorashop-ff-extension.zip" download class="btn btn-primary btn-sm" style="text-decoration:none;">
-                <svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                Download Extension (.zip)
-              </a>
-            </div>
-            <div class="field" style="margin-bottom:14px;">
-              <label>Extension Secret Key (Paste inside Extension Popup)</label>
-              <div class="key-row">
-                <input type="text" id="extKeyBox" readonly style="font-family:monospace;font-size:12px;" />
-                <button type="button" class="btn btn-secondary btn-sm" onclick="copyExtKey()">Copy Key</button>
-              </div>
-            </div>
-            <ul id="secInfoList" class="sec-list"></ul>
-          </div>
-        </div>
-      </section>
-
-      <section id="tab-uniqbd" class="tab-pane hidden">
-        <div class="card" id="uniqbdBanner" style="margin-bottom:14px;">
-          <div class="card-head">
-            <div class="card-title">
-              <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-              UniQbd connection
-            </div>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="checkUniqbd()">Check UniQbd</button>
-          </div>
-          <p id="uniqbdVerdict" style="margin:0 0 12px;color:var(--muted);">Loading connection…</p>
-          <ul id="uniqbdInfo" class="sec-list"></ul>
-          <pre id="uniqbdProbe" style="margin-top:12px;background:#06090d;border:1px solid var(--border);padding:12px;border-radius:10px;font-size:12px;overflow:auto;display:none;"></pre>
-        </div>
-        <div class="card" style="margin-bottom:14px;">
-          <div class="card-head">
-            <div class="card-title">Package match</div>
-            <span class="card-sub">UniQbd name → this package</span>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>UniQbd order</th>
-                  <th>Package</th>
-                  <th>Tokens</th>
-                  <th>Accounts</th>
-                  <th>Delivery</th>
-                </tr>
-              </thead>
-              <tbody id="uniqbdPackages"></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-head">
-            <div class="card-title">Orders from UniQbd</div>
-            <span class="card-sub">Latest 15</span>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>UniQbd order</th>
-                  <th>Player UID</th>
-                  <th>Package</th>
-                  <th>Status</th>
-                  <th>Webhook</th>
-                </tr>
-              </thead>
-              <tbody id="uniqbdOrders"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
     </main>
     </div>
     </div>
@@ -1068,7 +935,7 @@
         const matchBtn = document.querySelector(`.tab-btn[onclick*="'${name}'"]`);
         if (matchBtn) matchBtn.classList.add('active');
       }
-      const titles = { website: 'Dashboard', orders: 'Orders', vouchers: 'Tokens', accounts: 'Accounts', packages: 'Packages', security: 'Security', uniqbd: 'UniQbd' };
+      const titles = { website: 'Dashboard', orders: 'Orders', vouchers: 'Tokens', accounts: 'Accounts' };
       const title = document.querySelector('.topbar-title');
       if (title) title.textContent = titles[name] || 'Overview';
       localStorage.setItem('arora_active_tab', name);
@@ -1112,7 +979,8 @@
       if (me.ok) {
         document.getElementById('loginView').classList.add('hidden');
         document.getElementById('appView').classList.remove('hidden');
-        const lastTab = localStorage.getItem('arora_active_tab') || 'website';
+        const savedTab = localStorage.getItem('arora_active_tab') || 'website';
+        const lastTab = ['website', 'orders', 'vouchers', 'accounts'].includes(savedTab) ? savedTab : 'website';
         switchTab(lastTab, null);
         const helloDate = document.getElementById('helloDate');
         if (helloDate) helloDate.textContent = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -1157,6 +1025,8 @@
       const d = await api('/admin-api/dashboard');
       if (!d.ok) return;
       const sig = JSON.stringify(d);
+      const updated = document.getElementById('webUpdated');
+      if (updated) updated.textContent = 'Last update ' + new Date().toLocaleTimeString();
       if (sig === dashSig) return;
       dashSig = sig;
 
@@ -1190,7 +1060,6 @@
         .map((p) => `<option value="${p.package_code}">${p.name} (${p.package_code}) — Stock: ${p.available_tokens}</option>`)
         .join('');
       document.getElementById('vPkgCode').innerHTML = pkgOpts;
-      document.getElementById('testPkgCode').innerHTML = pkgOpts;
 
       document.getElementById('voucherSummaryBody').innerHTML = d.packages.map((p) => `
         <tr>
@@ -1198,23 +1067,6 @@
           <td><code>${p.package_code}</code></td>
           <td><span class="pill ${p.available_tokens > p.low_stock_threshold ? 'pill-green' : 'pill-amber'}">${p.available_tokens}</span></td>
           <td>${p.used_tokens}</td>
-        </tr>
-      `).join('');
-
-      document.getElementById('packagesBody').innerHTML = d.packages.map((p) => `
-        <tr style="${p.is_active ? '' : 'opacity:0.65;'}">
-          <td><code>${p.package_code}</code></td>
-          <td><input type="number" id="sid_${p.id}" value="${p.arora_service_id || ''}" style="width:82px;padding:6px 8px;" /></td>
-          <td><input type="text" id="pname_${p.id}" value="${p.name}" style="width:150px;padding:6px 8px;" /></td>
-          <td><input type="number" step="0.01" id="puc_${p.id}" value="${p.unipin_uc_cost}" style="width:88px;padding:6px 8px;" /></td>
-          <td><input type="number" id="plow_${p.id}" value="${p.low_stock_threshold}" style="width:72px;padding:6px 8px;" /></td>
-          <td><span class="pill pill-blue">${p.available_tokens}</span></td>
-          <td>
-            <button type="button" class="pill ${p.is_active ? 'pill-green' : 'pill-red'}" style="cursor:pointer;border:1px solid ${p.is_active ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'};" onclick="togglePackageActive(${p.id})" title="Click to toggle Active / Inactive">
-              ${p.is_active ? '● Active' : '○ Inactive'}
-            </button>
-          </td>
-          <td><button class="btn btn-primary btn-sm" onclick="savePackage(${p.id}, ${p.diamonds}, ${p.is_active ? 1 : 0})">Save</button></td>
         </tr>
       `).join('');
 
@@ -1284,18 +1136,12 @@
           `;
         }).join('');
 
-      const s = d.security_info;
+      const s = d.security_info || {};
       const keyBox = document.getElementById('extKeyBox');
-      keyBox.value = maskSecret(s.extension_key);
-      keyBox.dataset.full = s.extension_key || '';
-      document.getElementById('secInfoList').innerHTML = `
-        <li class="sec-row"><span>${ICONS.lock} Encryption</span><span class="pill pill-green">${s.encryption}</span></li>
-        <li class="sec-row"><span>${ICONS.shield} API Auth</span><span class="pill pill-green">${s.auth_scheme}</span></li>
-        <li class="sec-row"><span>${ICONS.globe} Allowed IPs</span><code>${s.allowed_ips}</code></li>
-        <li class="sec-row"><span>${ICONS.lock} Public Signup</span><span class="pill pill-green">Disabled</span></li>
-        <li class="sec-row"><span>${ICONS.send} Telegram Alerts</span><span class="pill ${s.telegram_connected ? 'pill-green' : 'pill-red'}">${s.telegram_connected ? 'Active' : 'Off'}</span></li>
-      `;
-      renderUniqbd(d.uniqbd, d.extension_status);
+      if (keyBox) {
+        keyBox.value = maskSecret(s.extension_key);
+        keyBox.dataset.full = s.extension_key || '';
+      }
       renderWebsite(d);
       } finally {
         dashBusy = false;
@@ -1359,63 +1205,27 @@
           </tr>
         `).join('');
       document.getElementById('webOrders').innerHTML = (d.orders || []).length === 0
-        ? '<tr><td colspan="3" style="color:var(--muted);">No orders yet.</td></tr>'
+        ? '<tr><td colspan="5" style="color:var(--muted);">No orders yet.</td></tr>'
         : d.orders.slice(0, 8).map((row) => `
           <tr>
             <td><code>${esc(row.player_uid)}</code></td>
             <td>${esc(row.package_name)}</td>
             <td><span class="pill ${row.status === 'COMPLETED' ? 'pill-green' : 'pill-amber'}">${esc(row.status)}</span></td>
+            <td>${esc(row.webhook_status || '—')}</td>
+            <td>${whenText(row.created_at)}</td>
           </tr>
         `).join('');
+    }
+
+    function whenText(value) {
+      if (!value) return '—';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return esc(value);
+      return date.toLocaleString();
     }
 
     function pill(ok, yes, no) {
       return `<span class="pill ${ok ? 'pill-green' : 'pill-red'}">${ok ? yes : no}</span>`;
-    }
-
-    function renderUniqbd(link, extension) {
-      if (!link) return;
-      const online = Boolean(extension && extension.online);
-      const stockReady = (link.packages || []).filter((row) => row.active).every((row) => row.ready);
-      const verdict = document.getElementById('uniqbdVerdict');
-      if (link.connected && online && stockReady) {
-        verdict.textContent = 'Connected. A UniQbd diamond order uses the same package here, and the extension can deliver it.';
-      } else if (link.connected) {
-        verdict.textContent = 'UniQbd can send orders here. Delivery still needs the extension online and a token or a new account for each package.';
-      } else {
-        verdict.textContent = 'Not fully connected. The API key or the UniQbd webhook is missing on this server.';
-      }
-      document.getElementById('uniqbdInfo').innerHTML = `
-        <li class="sec-row"><span>${ICONS.globe} Shop</span><code>https://${esc(link.shop)}</code></li>
-        <li class="sec-row"><span>${ICONS.send} Order API</span><code>${esc(link.api_url)}</code></li>
-        <li class="sec-row"><span>${ICONS.lock} API key</span>${pill(link.api_key_saved, 'Saved', 'Missing')}</li>
-        <li class="sec-row"><span>${ICONS.lock} API secret</span>${pill(link.api_secret_saved, 'Saved', 'Missing')}</li>
-        <li class="sec-row"><span>${ICONS.shield} Reseller</span>${pill(link.reseller_active, 'Active', 'Off')}</li>
-        <li class="sec-row"><span>${ICONS.send} Webhook</span><code>${esc(link.webhook_url || 'Not set')}</code></li>
-        <li class="sec-row"><span>${ICONS.check} Webhook target</span>${pill(link.webhook_ready, 'uniqbd.com', 'Wrong')}</li>
-        <li class="sec-row"><span>${ICONS.play} Extension</span>${pill(online, 'Online', 'Offline')}</li>
-        <li class="sec-row"><span>${ICONS.card} Old accounts</span><span class="pill ${link.old_accounts ? 'pill-amber' : 'pill-green'}">${link.old_accounts ? link.old_accounts + ' cannot be used' : 'None'}</span></li>
-      `;
-      document.getElementById('uniqbdPackages').innerHTML = (link.packages || []).map((row) => `
-        <tr>
-          <td><b>${esc(row.uniqbd_name)}</b></td>
-          <td><code>${esc(row.package_code)}</code><br><span style="color:var(--muted);">${esc(row.name)}</span></td>
-          <td>${row.ready_tokens}</td>
-          <td>${row.ready_accounts}</td>
-          <td>${pill(row.ready, 'Ready', row.active ? 'Need stock' : 'Inactive')}</td>
-        </tr>
-      `).join('');
-      document.getElementById('uniqbdOrders').innerHTML = (link.orders || []).length === 0
-        ? '<tr><td colspan="5" style="color:var(--muted);">No UniQbd order has arrived yet.</td></tr>'
-        : link.orders.map((row) => `
-          <tr>
-            <td><code>${esc(row.uniqbd_order_id)}</code></td>
-            <td><code>${esc(row.player_uid)}</code></td>
-            <td>${esc(row.package_name)}<br><code>${esc(row.package_code)}</code></td>
-            <td><span class="pill ${row.status === 'COMPLETED' ? 'pill-green' : 'pill-amber'}">${esc(row.status)}</span></td>
-            <td>${esc(row.webhook_status || '—')}</td>
-          </tr>
-        `).join('');
     }
 
     async function checkUniqbd() {
@@ -1587,34 +1397,17 @@
       loadDashboard();
     }
 
-    document.getElementById('testOrderForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const r = await api('/admin-api/test-order', {
-        method: 'POST',
-        body: JSON.stringify({
-          package_code: document.getElementById('testPkgCode').value,
-          player_uid: document.getElementById('testUid').value,
-          quantity: 1,
-        }),
-      });
-      const pre = document.getElementById('testOrderResult');
-      pre.style.display = 'block';
-      pre.textContent = JSON.stringify(r, null, 2);
-      showToast(r.status === 'COMPLETED' ? 'Order completed!' : 'Order set to Processing.');
-      loadDashboard();
-    });
-
-    async function testTelegram() {
-      const r = await api('/admin-api/test-telegram', { method: 'POST' });
-      showToast(r.ok ? 'Telegram test alert sent.' : 'Telegram failed.');
-    }
-
     function copyExtKey() {
       const val = document.getElementById('extKeyBox').dataset.full || '';
       if (!val) return;
       navigator.clipboard.writeText(val);
       showToast('Extension Key copied!');
     }
+
+    setInterval(() => {
+      const app = document.getElementById('appView');
+      if (app && !app.classList.contains('hidden')) loadDashboard();
+    }, 15000);
 
     checkAuth();
   </script>
