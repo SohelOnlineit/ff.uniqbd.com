@@ -1279,29 +1279,53 @@ function cancelStuckProcessingOrders() {
   restoreUnusedTokens();
 }
 
-function restoreUnusedTokens() {
-  const release = `UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
-    WHERE lower(status) <> 'available'
-      AND COALESCE(used_order_utr, '') <> ''
-      AND used_order_utr NOT IN (
-        SELECT arora_order_utr FROM fulfillment_orders
-        WHERE status = 'COMPLETED' AND arora_order_utr IS NOT NULL
-      )`;
-  const keepFresh = ` AND used_order_utr NOT IN (
-        SELECT arora_order_utr FROM fulfillment_orders
-        WHERE status = 'IN_PROGRESS_EXT' AND claimed_at IS NOT NULL
-          AND claimed_at >= CURRENT_TIMESTAMP - INTERVAL '4 minutes'
-          AND arora_order_utr IS NOT NULL
-      )`;
+function markSpentVoucher(utr, voucherIds) {
+  const ids = String(voucherIds || '').split(',').map((part) => Number(String(part).trim())).filter((id) => id > 0);
+  const extra = ids.length ? ` OR id IN (${ids.join(',')})` : '';
   try {
-    pg(release + keepFresh);
+    pg(`UPDATE unipin_vouchers
+      SET status = 'used', used_order_utr = ${sqlString(utr)}, used_at = COALESCE(used_at, CURRENT_TIMESTAMP)
+      WHERE used_order_utr = ${sqlString(utr)}${extra}`);
+  } catch (err) {
+    console.error('mark token used:', dbError(err));
+  }
+}
+
+function keepSpentTokens() {
+  try {
+    pg(`UPDATE unipin_vouchers v
+      SET status = 'used',
+          used_order_utr = o.arora_order_utr,
+          used_at = COALESCE(v.used_at, o.completed_at, CURRENT_TIMESTAMP)
+      FROM fulfillment_orders o
+      WHERE o.status = 'COMPLETED'
+        AND o.method_used = 'unipin_voucher'
+        AND COALESCE(o.voucher_ids, '') <> ''
+        AND v.id::text = ANY (string_to_array(replace(o.voucher_ids, ' ', ''), ','))
+        AND (lower(COALESCE(v.status, '')) <> 'used' OR COALESCE(v.used_order_utr, '') = '')`);
+  } catch (err) {
+    console.error('keep spent tokens:', dbError(err));
+  }
+}
+
+function restoreUnusedTokens() {
+  keepSpentTokens();
+  const stillHeld = `SELECT arora_order_utr FROM fulfillment_orders
+        WHERE status IN ('COMPLETED', 'IN_PROGRESS_EXT', 'PROCESSING', 'PAUSED')
+          AND arora_order_utr IS NOT NULL`;
+  const heldIds = `SELECT CAST(trim(token_id) AS INTEGER)
+        FROM fulfillment_orders,
+             LATERAL regexp_split_to_table(COALESCE(voucher_ids, ''), ',') AS token_id
+        WHERE status IN ('COMPLETED', 'IN_PROGRESS_EXT', 'PROCESSING', 'PAUSED')
+          AND trim(token_id) ~ '^[0-9]+$'`;
+  try {
+    pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
+      WHERE lower(status) <> 'available'
+        AND COALESCE(used_order_utr, '') <> ''
+        AND used_order_utr NOT IN (${stillHeld})
+        AND id NOT IN (${heldIds})`);
   } catch (err) {
     console.error('restore tokens:', dbError(err));
-    try {
-      pg(release);
-    } catch (err2) {
-      console.error('restore tokens:', dbError(err2));
-    }
   }
 }
 
@@ -1314,7 +1338,7 @@ function finishExtensionOrder(body) {
   if (!utr) return;
   let order = null;
   try {
-    order = pgOne(`SELECT status, arora_order_utr, shop_order_number, player_uid, package_code, package_name, quantity, reseller_order_id, account_id, order_price_bdt
+    order = pgOne(`SELECT status, arora_order_utr, shop_order_number, player_uid, package_code, package_name, quantity, reseller_order_id, account_id, order_price_bdt, voucher_ids
       FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(utr)} LIMIT 1`);
   } catch (err) {
     console.error('order result lookup:', dbError(err));
@@ -1331,6 +1355,7 @@ function finishExtensionOrder(body) {
   pg(`UPDATE fulfillment_orders
     SET status = 'COMPLETED', status_reason = ${sqlString(reason)}, receipt_note = ${sqlString(receipt)}, completed_at = CURRENT_TIMESTAMP
     WHERE arora_order_utr = ${sqlString(utr)}`);
+  markSpentVoucher(utr, order.voucher_ids);
   if (order.status !== 'COMPLETED') notifyOrderStatus(order, 'COMPLETED', reason);
   if (order.account_id) {
     const pack = pgOne(`SELECT unipin_uc_cost FROM ff_packages WHERE package_code = ${sqlString(order.package_code)} LIMIT 1`) || {};
