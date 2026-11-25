@@ -2143,10 +2143,10 @@
                 ${o.status === 'COMPLETED'
                   ? '<span style="color:#34d399;font-size:12px;margin-right:4px;">Done</span>'
                   : loginFailed
-                  ? `<span style="color:#fb7185;font-size:12px;margin-right:4px;">Login Failed</span><button class="btn btn-secondary btn-sm" onclick="retryOrder(${Number(o.id)})" title="Try this order again" style="border-color:rgba(56,189,248,0.45);color:#38bdf8;">↻ Retry</button>`
+                  ? `<span style="color:#fb7185;font-size:12px;margin-right:4px;">Login Failed</span><button type="button" class="btn btn-secondary btn-sm" onclick="retryOrder(${Number(o.id)})" title="Try this order again" style="border-color:rgba(56,189,248,0.45);color:#38bdf8;">↻ Retry</button>`
                   : o.status === 'CANCELLED'
-                  ? `<span style="color:#fb7185;font-size:12px;margin-right:4px;">Cancelled</span><button class="btn btn-secondary btn-sm" onclick="retryOrder(${Number(o.id)})" title="Try this order again" style="border-color:rgba(56,189,248,0.45);color:#38bdf8;">↻ Retry</button>`
-                  : `<button class="btn btn-secondary btn-sm" onclick="retryOrder(${Number(o.id)})" title="Retry Auto Delivery in Extension" style="border-color:rgba(56,189,248,0.45);color:#38bdf8;">↻ Retry</button><button class="btn btn-primary btn-sm" onclick="manualComplete(${Number(o.id)})" title="Mark Completed">${ICONS.check} Complete</button>${pauseBtnHtml}`}
+                  ? `<span style="color:#fb7185;font-size:12px;margin-right:4px;">Cancelled</span><button type="button" class="btn btn-secondary btn-sm" onclick="retryOrder(${Number(o.id)})" title="Try this order again" style="border-color:rgba(56,189,248,0.45);color:#38bdf8;">↻ Retry</button>`
+                  : `<button type="button" class="btn btn-secondary btn-sm" onclick="retryOrder(${Number(o.id)})" title="Retry Auto Delivery in Extension" style="border-color:rgba(56,189,248,0.45);color:#38bdf8;">↻ Retry</button><button type="button" class="btn btn-primary btn-sm" onclick="manualComplete(${Number(o.id)})" title="Mark Completed">${ICONS.check} Complete</button>${pauseBtnHtml}`}
                 <button class="btn btn-danger btn-sm" onclick="deleteOrder(${Number(o.id)})" title="Delete Order">${ICONS.trash}</button>
               </div>
             </td>
@@ -2614,15 +2614,16 @@
     async function retryOrder(id) {
       const yes = await askConfirm('Send this order again?', 'The extension will try to deliver the diamonds for this order.', 'Send again');
       if (!yes) return;
-      const r = await api(`/admin-api/orders/${id}/retry`, {
-        method: 'POST',
-        body: JSON.stringify({}),
-      });
-      if (r.ok) {
-        showToast(r.message || 'Order re-queued for Extension retry!');
+      try {
+        const r = await api(`/admin-api/orders/${id}/retry`, {
+          method: 'POST',
+          body: JSON.stringify({}),
+        });
+        showToast(r.ok ? (r.message || 'Order sent to the extension.') : (r.error || 'Retry failed.'));
+        dashSig = '';
         loadDashboard();
-      } else {
-        showToast(r.error || 'Retry failed.');
+      } catch {
+        showToast('Retry failed.');
       }
     }
 

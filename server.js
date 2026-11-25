@@ -572,6 +572,7 @@ function ensureDeskColumns() {
     'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS shop_order_number TEXT',
     'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS delivery_attempts INTEGER DEFAULT 0',
     'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMP',
+    'ALTER TABLE fulfillment_orders ADD COLUMN IF NOT EXISTS retry_at TIMESTAMP',
     'ALTER TABLE unipin_vouchers ADD COLUMN IF NOT EXISTS token_hash TEXT',
     'ALTER TABLE unipin_loaded_accounts ADD COLUMN IF NOT EXISTS security_pin_encrypted TEXT',
     'ALTER TABLE unipin_loaded_accounts ADD COLUMN IF NOT EXISTS masked_email TEXT',
@@ -1037,22 +1038,34 @@ function stopOverTriedOrders() {
 function claimNextTask() {
   cancelStuckProcessingOrders();
   stopOverTriedOrders();
-  let order = null;
+  let orders = [];
   try {
-    order = pgOne(`SELECT id, arora_order_utr, shop_order_number, player_uid, package_code, package_name, account_id
+    orders = pgJson(`SELECT id, arora_order_utr, shop_order_number, player_uid, package_code, package_name, account_id
       FROM fulfillment_orders
       WHERE status = 'QUEUED_EXT' AND COALESCE(delivery_attempts, 0) < ${DELIVERY_TRY_LIMIT}
-      ORDER BY id
-      LIMIT 1`);
+      ORDER BY retry_at DESC NULLS LAST, id
+      LIMIT 20`);
   } catch (err) {
     console.error('claim order:', dbError(err));
-    order = pgOne(`SELECT id, arora_order_utr, player_uid, package_code, package_name, account_id
-      FROM fulfillment_orders
-      WHERE status = 'QUEUED_EXT'
-      ORDER BY id
-      LIMIT 1`);
+    try {
+      orders = pgJson(`SELECT id, arora_order_utr, player_uid, package_code, package_name, account_id
+        FROM fulfillment_orders
+        WHERE status = 'QUEUED_EXT'
+        ORDER BY id
+        LIMIT 20`);
+    } catch (err2) {
+      console.error('claim order:', dbError(err2));
+      return null;
+    }
   }
-  if (!order) return null;
+  for (const order of orders) {
+    const task = claimQueuedOrder(order);
+    if (task) return task;
+  }
+  return null;
+}
+
+function claimQueuedOrder(order) {
   let voucher = null;
   try {
     voucher = pgOne(`SELECT id, code_encrypted FROM unipin_vouchers
@@ -1116,17 +1129,47 @@ function claimNextTask() {
   };
 }
 
+function packageReady(packageCode) {
+  const code = sqlString(packageCode || '');
+  try {
+    const voucher = pgOne(`SELECT id FROM unipin_vouchers
+      WHERE package_code = ${code} AND lower(status) = 'available' AND ${cipherIsCurrent('code_encrypted')}
+      LIMIT 1`);
+    if (voucher) return true;
+  } catch (err) {
+    console.error('retry token:', dbError(err));
+  }
+  try {
+    const pack = pgOne(`SELECT unipin_uc_cost FROM ff_packages WHERE package_code = ${code} LIMIT 1`) || {};
+    const account = pgOne(`SELECT id FROM unipin_loaded_accounts
+      WHERE lower(status) = 'active' AND balance >= ${num(pack.unipin_uc_cost)} AND ${cipherIsCurrent('credentials_encrypted')}
+      LIMIT 1`);
+    return Boolean(account);
+  } catch (err) {
+    console.error('retry account:', dbError(err));
+    return false;
+  }
+}
+
 function requeueOrder(id) {
-  const row = pgOne(`SELECT id, arora_order_utr, shop_order_number, player_uid, package_name, status FROM fulfillment_orders WHERE id = ${id} LIMIT 1`);
+  const row = pgOne(`SELECT id, arora_order_utr, shop_order_number, player_uid, package_code, package_name, status FROM fulfillment_orders WHERE id = ${id} LIMIT 1`);
   if (!row) return { status: 404, body: { ok: false, error: 'Order not found' } };
   if (row.status === 'COMPLETED') return { status: 400, body: { ok: false, error: 'Completed orders stay completed' } };
   pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
     WHERE used_order_utr = ${sqlString(row.arora_order_utr)}`);
+  const ready = packageReady(row.package_code);
+  const reason = ready ? '' : 'No token or account is ready for this package.';
   pg(`UPDATE fulfillment_orders
-    SET status = 'QUEUED_EXT', method_used = 'none', account_id = NULL, voucher_ids = NULL, status_reason = '', receipt_note = '', delivery_attempts = 0
+    SET status = 'QUEUED_EXT', method_used = 'none', account_id = NULL, voucher_ids = NULL,
+        status_reason = ${sqlString(reason)}, receipt_note = '', delivery_attempts = 0,
+        claimed_at = NULL, retry_at = CURRENT_TIMESTAMP
     WHERE id = ${id}`);
-  if (row.status !== 'QUEUED_EXT') notifyOrderStatus(row, 'QUEUED_EXT', '');
-  return { status: 200, body: { ok: true, message: 'Order queued for the extension.' } };
+  if (row.status !== 'QUEUED_EXT') notifyOrderStatus(row, 'QUEUED_EXT', reason);
+  const ext = pgOne('SELECT last_seen_at FROM extension_status LIMIT 1') || {};
+  let message = 'Order sent to the extension.';
+  if (!ready) message = 'No token or account is ready for this package.';
+  else if (!seenOnline(ext.last_seen_at)) message = 'Order queued. The extension is offline.';
+  return { status: 200, body: { ok: true, message } };
 }
 
 function orderActionResult(id, action, body) {
@@ -2022,8 +2065,9 @@ const server = http.createServer(async (req, res) => {
       if (!extensionMatches(req)) return sendJson(res, 401, { ok: false, error: 'Invalid extension key' });
       const utr = String(requestUrl.searchParams.get('utr') || '').trim().slice(0, 80);
       if (!utr) return sendJson(res, 400, { ok: false });
-      const row = pgOne(`SELECT status FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(utr)} LIMIT 1`);
-      const open = Boolean(row) && (row.status === 'QUEUED_EXT' || row.status === 'IN_PROGRESS_EXT' || row.status === 'PROCESSING');
+      const row = pgOne(`SELECT status, retry_at, claimed_at FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(utr)} LIMIT 1`);
+      const freshRetry = Boolean(row && row.retry_at && !row.claimed_at && row.status === 'QUEUED_EXT');
+      const open = Boolean(row) && !freshRetry && (row.status === 'QUEUED_EXT' || row.status === 'IN_PROGRESS_EXT' || row.status === 'PROCESSING');
       return sendJson(res, 200, { ok: true, open });
     } catch (err) {
       console.error('order open failed:', dbError(err));
