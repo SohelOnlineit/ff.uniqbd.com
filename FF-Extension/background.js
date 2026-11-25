@@ -192,15 +192,17 @@ async function pollNextOrderNow(force = false) {
   if (st.activeTask && st.activeTask.order_utr && (await orderStillOpen(st, st.activeTask.order_utr)) === false) {
     const stopped = shownOrder(st.activeTask);
     const tabId = st.activeTabId;
+    st.activeTask = null;
+    st.activeTabId = null;
+    st.pendingResult = null;
     await chrome.storage.local.set({
       activeTask: null,
       activeTabId: null,
       pendingResult: null,
-      lastLog: `Stopped ${stopped}. This order is not paid.`,
+      lastLog: `Stopped ${stopped}. Checking the queue.`,
     });
     await closeDeliveryTabs(null);
     if (tabId) await closeFulfillmentTab(tabId);
-    return { ok: true, stopped: true };
   }
 
   // A task with no start time, or one that has already run too long, must not block the next order.

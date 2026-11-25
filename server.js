@@ -1152,18 +1152,38 @@ function packageReady(packageCode) {
 }
 
 function requeueOrder(id) {
-  const row = pgOne(`SELECT id, arora_order_utr, shop_order_number, player_uid, package_code, package_name, status FROM fulfillment_orders WHERE id = ${id} LIMIT 1`);
+  let row = null;
+  try {
+    row = pgOne(`SELECT id, arora_order_utr, shop_order_number, player_uid, package_code, package_name, status FROM fulfillment_orders WHERE id = ${id} LIMIT 1`);
+  } catch (err) {
+    console.error('retry lookup:', dbError(err));
+    row = pgOne(`SELECT id, arora_order_utr, player_uid, package_code, package_name, status FROM fulfillment_orders WHERE id = ${id} LIMIT 1`);
+  }
   if (!row) return { status: 404, body: { ok: false, error: 'Order not found' } };
   if (row.status === 'COMPLETED') return { status: 400, body: { ok: false, error: 'Completed orders stay completed' } };
-  pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
-    WHERE used_order_utr = ${sqlString(row.arora_order_utr)}`);
+  try {
+    pg(`UPDATE unipin_vouchers SET status = 'available', used_order_utr = NULL, used_at = NULL
+      WHERE used_order_utr = ${sqlString(row.arora_order_utr)}`);
+  } catch (err) {
+    console.error('retry token:', dbError(err));
+  }
   const ready = packageReady(row.package_code);
   const reason = ready ? '' : 'No token or account is ready for this package.';
-  pg(`UPDATE fulfillment_orders
-    SET status = 'QUEUED_EXT', method_used = 'none', account_id = NULL, voucher_ids = NULL,
-        status_reason = ${sqlString(reason)}, receipt_note = '', delivery_attempts = 0,
-        claimed_at = NULL, retry_at = CURRENT_TIMESTAMP
-    WHERE id = ${id}`);
+  const queued = `status = 'QUEUED_EXT', method_used = 'retry', account_id = NULL, voucher_ids = NULL,
+        status_reason = ${sqlString(reason)}, receipt_note = ''`;
+  try {
+    pg(`UPDATE fulfillment_orders
+      SET ${queued}, delivery_attempts = 0, claimed_at = NULL, retry_at = CURRENT_TIMESTAMP
+      WHERE id = ${id}`);
+  } catch (err) {
+    console.error('retry queue:', dbError(err));
+    try {
+      pg(`UPDATE fulfillment_orders SET ${queued} WHERE id = ${id}`);
+    } catch (err2) {
+      console.error('retry queue:', dbError(err2));
+      return { status: 500, body: { ok: false, error: 'Could not queue this order.' } };
+    }
+  }
   if (row.status !== 'QUEUED_EXT') notifyOrderStatus(row, 'QUEUED_EXT', reason);
   const ext = pgOne('SELECT last_seen_at FROM extension_status LIMIT 1') || {};
   let message = 'Order sent to the extension.';
@@ -2065,8 +2085,14 @@ const server = http.createServer(async (req, res) => {
       if (!extensionMatches(req)) return sendJson(res, 401, { ok: false, error: 'Invalid extension key' });
       const utr = String(requestUrl.searchParams.get('utr') || '').trim().slice(0, 80);
       if (!utr) return sendJson(res, 400, { ok: false });
-      const row = pgOne(`SELECT status, retry_at, claimed_at FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(utr)} LIMIT 1`);
-      const freshRetry = Boolean(row && row.retry_at && !row.claimed_at && row.status === 'QUEUED_EXT');
+      let row = null;
+      try {
+        row = pgOne(`SELECT status, method_used, retry_at, claimed_at FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(utr)} LIMIT 1`);
+      } catch (err) {
+        console.error('order open:', dbError(err));
+        row = pgOne(`SELECT status, method_used FROM fulfillment_orders WHERE arora_order_utr = ${sqlString(utr)} LIMIT 1`);
+      }
+      const freshRetry = Boolean(row && row.status === 'QUEUED_EXT' && (row.method_used === 'retry' || (row.retry_at && !row.claimed_at)));
       const open = Boolean(row) && !freshRetry && (row.status === 'QUEUED_EXT' || row.status === 'IN_PROGRESS_EXT' || row.status === 'PROCESSING');
       return sendJson(res, 200, { ok: true, open });
     } catch (err) {
